@@ -75,3 +75,16 @@ The parser remains a deliberately incomplete HTML parser. It does not yet implem
 - **CI:** pending; no Phase 3 pass is claimed.
 - **Blocking earlier result:** Phase 2's selector-group test failed on the last completed recorded run (`43062022982`). The new CSS changes do not resolve or bypass that test. The current candidate must pass the full suite before this increment is considered verified.
 - **Known gaps:** no full CSS Syntax specification tokenizer, escaped identifier decoding, selector combinator/attribute/pseudo matching, nested at-rule evaluation, cascade origins/importance/inheritance/custom properties, media queries, computed-value resolution or full CSS value grammar.
+
+
+## Phase 7 — graphics foundation (parallel, integration deferred)
+
+- Added `ZorviPaintCommand` display-list records for rectangle fills, text and bitmap drawing, plus a small Android Canvas raster backend.
+- Added platform-neutral `ZorviRect` geometry to keep display-list records independent of Android Canvas geometry classes.
+- Added generic CSS font-family fallback mapping to Android Typeface with bold/italic selection.
+- Added bounded bitmap decoding: maximum encoded input 16 MiB, maximum decoded dimensions 16 megapixels, target-size power-of-two sampling, and failure results instead of propagating decode/OOM exceptions.
+- Added three unit tests for sampling bounds and immutable paint geometry.
+- **Implementation commits:** `f9f1dea2275c24867bafa13f45c4a878d8396e38`, `5924a821aa27cd347ab712eba86384e1017acffa`, `4754984ce9ee0d095930d9b9921c3d08a801823d`, `b45402ad153926bc12440ef6d3f4c1c3caa4ad6f`.
+- **Verification:** pending CI. No passing build or test result is claimed.
+- **Integration constraint:** Phases 4–6 are being developed in another conversation. This increment deliberately adds isolated graphics primitives and does not modify layout, scripting, Web APIs, networking or the browser view.
+- **Known gaps:** no resource loader integration, SVG, web Canvas API, text shaping, glyph runs, clipping/transform stack, image cache, GPU acceleration, damage tracking, layer compositing or broad image-format conformance.
