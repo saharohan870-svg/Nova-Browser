@@ -1,7 +1,7 @@
-package com.nova.engine
+package com.zorvi.engine
 
 /**
- * Tiny first-pass HTML tree builder for Nova Engine.
+ * Tiny first-pass HTML tree builder for Zorvi Engine.
  *
  * This intentionally supports a small safe subset and is not an HTML5 parser.
  * It never executes script contents. Unknown tags are retained as generic
