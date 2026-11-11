@@ -1,6 +1,6 @@
-# Nova Engine (independent prototype)
+# Zorvi Engine (independent prototype)
 
-Nova Engine is a new Android-native browser engine experiment. It does not embed Chromium, Blink, Gecko, WebKit, or Android System WebView.
+Zorvi Engine is a new Android-native browser engine experiment. It does not embed Chromium, Blink, Gecko, WebKit, or Android System WebView.
 
 ## First milestone
 
@@ -15,8 +15,8 @@ This is **not** a standards-complete browser. JavaScript execution, CSS cascade,
 
 ## Architecture
 
-- `src/main/java/com/nova/engine/HtmlDocument.kt`: small HTML tokenizer/tree builder
-- `src/main/java/com/nova/engine/NovaEngineView.kt`: networking, basic layout, Canvas rendering and link interaction
+- `src/main/java/com/zorvi/engine/HtmlDocument.kt`: small HTML tokenizer/tree builder
+- `src/main/java/com/zorvi/engine/ZorviEngineView.kt`: networking, basic layout, Canvas rendering and link interaction
 
 The code is intentionally dependency-free for this first milestone. Later milestones can evaluate standalone parser/JS libraries without importing an existing browser engine.
 
