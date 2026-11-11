@@ -241,6 +241,22 @@ internal data class HtmlDocument(val root: HtmlNode) {
         return result
     }
 
+    fun findAll(tag: String): List<HtmlNode> = buildList {
+        fun collect(node: HtmlNode) {
+            if (node.tag.equals(tag, true)) add(node)
+            node.children.forEach(::collect)
+        }
+        collect(root)
+    }
+
+    fun textContent(node: HtmlNode): String = buildString {
+        fun collect(current: HtmlNode) {
+            if (current.tag == "#text") append(current.text)
+            else current.children.forEach(::collect)
+        }
+        collect(node)
+    }
+
     fun findFirst(tag: String): HtmlNode? {
         fun search(node: HtmlNode): HtmlNode? {
             if (node.tag.equals(tag, true)) return node
