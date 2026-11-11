@@ -25,6 +25,7 @@ internal data class ZorviHttpRequest(
             require('\r' !in value && '\n' !in value)
         }
     }
+    companion object { const val DEFAULT_MAX_RESPONSE_BYTES = 5 * 1024 * 1024 }
 }
 
 internal data class ZorviHttpResponse(
