@@ -27,6 +27,9 @@ class NovaEngineView(context: Context) : View(context) {
     private var documentHeight = 0f
     private var styleSheet = NovaCssStyleSheet("")
     private var pageUrl: URL? = null
+    private var domDocument: NovaDomDocument? = null
+    private val engineEvents = NovaEventTarget()
+    var onDomEvent: ((NovaEngineEvent) -> Unit)? = null
     var onNavigate: ((String) -> Unit)? = null
     var onPageTitle: ((String) -> Unit)? = null
     var onLoadError: ((String) -> Unit)? = null
@@ -36,7 +39,7 @@ class NovaEngineView(context: Context) : View(context) {
         isFocusable = true
     }
 
-    fun loadUrl(address: String) {
+    fun addEventListener(type: String, handler: (NovaEngineEvent) -> Unit) = engineEvents.addEventListener(type, handler)\n\n    fun removeEventListener(type: String, handler: (NovaEngineEvent) -> Unit) = engineEvents.removeEventListener(type, handler)\n\n    fun loadUrl(address: String) {
         val target = runCatching { URL(address) }.getOrNull()
         if (target == null || target.protocol !in setOf("http", "https")) {
             onLoadError?.invoke("Only HTTP and HTTPS are supported in this engine prototype")
@@ -148,7 +151,7 @@ class NovaEngineView(context: Context) : View(context) {
                 if (hit != null) {
                     val destination = runCatching { URL(pageUrl, hit.second).toString() }.getOrNull()
                     if (destination != null && (destination.startsWith("https://") || destination.startsWith("http://"))) {
-                        onNavigate?.invoke(destination)
+                        val event = NovaEngineEvent("click", payload = destination)\n                        engineEvents.dispatch(event)\n                        onDomEvent?.invoke(event)\n                        onNavigate?.invoke(destination)
                     }
                 }
                 return true
