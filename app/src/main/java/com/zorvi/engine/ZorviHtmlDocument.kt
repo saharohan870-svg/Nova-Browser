@@ -1,11 +1,14 @@
 package com.zorvi.engine
 
 /**
- * Tiny first-pass HTML tree builder for Zorvi Engine.
+ * Lightweight HTML document model and tokenizer/tree builder.
  *
- * This intentionally supports a small safe subset and is not an HTML5 parser.
- * It never executes script contents. Unknown tags are retained as generic
- * containers so their text remains readable.
+ * This is the first standards-oriented parser milestone, not a complete WHATWG
+ * HTML parser. It implements bounded tokenization, quoted/unquoted attributes,
+ * comments/declarations, void elements, raw-text elements, basic implied-end-tag
+ * handling, common character references and implied html/head/body containers.
+ * The parser is deliberately isolated so it can later be replaced or extended
+ * without changing DOM, CSS, layout or browser-shell APIs.
  */
 internal data class HtmlNode(
     val tag: String,
@@ -16,64 +19,211 @@ internal data class HtmlNode(
 
 internal data class HtmlDocument(val root: HtmlNode) {
     companion object {
-        private val voidTags = setOf("area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr")
-        private val blockTags = setOf("address", "article", "blockquote", "div", "footer", "h1", "h2", "h3", "h4", "header", "li", "main", "nav", "ol", "p", "pre", "section", "ul")
+        private const val MAX_SOURCE_CHARS = 2_000_000
+        private val voidTags = setOf(
+            "area", "base", "br", "col", "embed", "hr", "img", "input",
+            "link", "meta", "param", "source", "track", "wbr"
+        )
+        private val rawTextTags = setOf("script", "style", "textarea", "title")
+        private val pClosers = setOf(
+            "address", "article", "aside", "blockquote", "div", "dl", "fieldset",
+            "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "header",
+            "hr", "main", "nav", "ol", "p", "pre", "section", "table", "ul"
+        )
+        private val headingTags = setOf("h1", "h2", "h3", "h4", "h5", "h6")
 
         fun parse(source: String): HtmlDocument {
-            val root = HtmlNode("document")
-            val stack = mutableListOf(root)
-            val token = Regex("(?s)<!--.*?-->|<![^>]*>|<[^>]*>|[^<]+")
-            val attr = Regex("""([a-zA-Z_:][a-zA-Z0-9_:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""")
-            token.findAll(source.take(2_000_000)).forEach { match ->
-                val part = match.value
-                when {
-                    part.startsWith("<!--") || part.startsWith("<!") -> Unit
-                    part.startsWith("</") -> {
-                        val name = part.drop(2).substringBefore('>').trim().substringBefore(' ').lowercase()
-                        val index = stack.indexOfLast { it.tag == name }
-                        if (index > 0) while (stack.size > index) stack.removeAt(stack.lastIndex)
-                    }
-                    part.startsWith("<") -> {
-                        val inside = part.drop(1).dropLast(1).trim()
-                        val name = inside.split(Regex("\\s"), limit = 2).first().trimEnd('/').lowercase()
-                        if (name.isEmpty() || name.startsWith("?")) return@forEach
-                        val attrs = attr.findAll(inside.drop(name.length)).associate {
-                            it.groupValues[1].lowercase() to (it.groups[2]?.value ?: it.groups[3]?.value ?: it.groups[4]?.value.orEmpty())
-                        }
-                        val node = HtmlNode(name, attributes = attrs)
-                        stack.last().children.add(node)
-                        if (name !in voidTags && !inside.endsWith("/")) stack.add(node)
-                    }
-                    else -> {
-                        val parent = stack.last()
-                        if (parent.tag != "script" && parent.tag != "style") {
-                            val value = decodeEntities(part)
-                            if (value.isNotBlank()) parent.children.add(HtmlNode("#text", value))
-                        }
-                    }
+            val input = source.take(MAX_SOURCE_CHARS)
+            val document = HtmlNode("document")
+            val html = HtmlNode("html")
+            val head = HtmlNode("head")
+            val body = HtmlNode("body")
+            document.children += html
+            html.children += head
+            html.children += body
+
+            val stack = mutableListOf(html)
+            var inHead = true
+            var cursor = 0
+
+            fun current(): HtmlNode = stack.lastOrNull() ?: body
+            fun switchToBody() {
+                inHead = false
+                stack.clear()
+                stack += html
+                stack += body
+            }
+            fun appendText(value: String) {
+                if (value.isEmpty()) return
+                val parent = current()
+                val decoded = decodeEntities(value)
+                val last = parent.children.lastOrNull()
+                if (last?.tag == "#text") {
+                    parent.children[parent.children.lastIndex] = last.copy(text = last.text + decoded)
+                } else {
+                    parent.children += HtmlNode("#text", decoded)
                 }
             }
-            return HtmlDocument(root)
+            fun closeOpen(tag: String) {
+                val index = stack.indexOfLast { it.tag == tag }
+                if (index > 0) while (stack.size > index) stack.removeAt(stack.lastIndex)
+            }
+            fun closeParagraphIfNeeded(nextTag: String) {
+                if (nextTag in pClosers && stack.any { it.tag == "p" }) closeOpen("p")
+            }
+            fun parseAttributes(sourceTag: String, from: Int): Map<String, String> {
+                val result = linkedMapOf<String, String>()
+                var i = from
+                while (i < sourceTag.length) {
+                    while (i < sourceTag.length && (sourceTag[i].isWhitespace() || sourceTag[i] == '/')) i++
+                    if (i >= sourceTag.length || sourceTag[i] == '>') break
+                    val start = i
+                    while (i < sourceTag.length && !sourceTag[i].isWhitespace() && sourceTag[i] !in charArrayOf('=', '/', '>')) i++
+                    if (i == start) { i++; continue }
+                    val name = sourceTag.substring(start, i).lowercase()
+                    while (i < sourceTag.length && sourceTag[i].isWhitespace()) i++
+                    var value = ""
+                    if (i < sourceTag.length && sourceTag[i] == '=') {
+                        i++
+                        while (i < sourceTag.length && sourceTag[i].isWhitespace()) i++
+                        if (i < sourceTag.length && (sourceTag[i] == '"' || sourceTag[i] == '\'')) {
+                            val quote = sourceTag[i++]
+                            val valueStart = i
+                            while (i < sourceTag.length && sourceTag[i] != quote) i++
+                            value = sourceTag.substring(valueStart, i)
+                            if (i < sourceTag.length) i++
+                        } else {
+                            val valueStart = i
+                            while (i < sourceTag.length && !sourceTag[i].isWhitespace() && sourceTag[i] != '>') i++
+                            value = sourceTag.substring(valueStart, i).trimEnd('/')
+                        }
+                    }
+                    if (name.isNotEmpty() && name !in result) result[name] = decodeEntities(value)
+                }
+                return result
+            }
+
+            while (cursor < input.length) {
+                val parent = current()
+                if (parent.tag in rawTextTags) {
+                    val closeStart = input.indexOf("</${parent.tag}", cursor, ignoreCase = true)
+                    val end = if (closeStart < 0) input.length else closeStart
+                    appendText(input.substring(cursor, end))
+                    cursor = end
+                    if (cursor >= input.length) break
+                }
+
+                if (input[cursor] != '<') {
+                    val next = input.indexOf('<', cursor).let { if (it < 0) input.length else it }
+                    appendText(input.substring(cursor, next))
+                    cursor = next
+                    continue
+                }
+
+                if (input.startsWith("<!--", cursor)) {
+                    val end = input.indexOf("-->", cursor + 4)
+                    cursor = if (end < 0) input.length else end + 3
+                    continue
+                }
+                if (input.startsWith("<!", cursor) || input.startsWith("<?", cursor)) {
+                    val end = input.indexOf('>', cursor + 2)
+                    cursor = if (end < 0) input.length else end + 1
+                    continue
+                }
+
+                val tagEnd = findTagEnd(input, cursor + 1)
+                if (tagEnd < 0) {
+                    appendText(input.substring(cursor))
+                    break
+                }
+                val rawTag = input.substring(cursor + 1, tagEnd)
+                cursor = tagEnd + 1
+                val trimmed = rawTag.trim()
+                if (trimmed.isEmpty()) { appendText("<>"); continue }
+
+                if (trimmed.startsWith("/")) {
+                    val name = trimmed.drop(1).takeWhile { !it.isWhitespace() && it != '/' }.lowercase()
+                    if (name.isNotEmpty()) closeOpen(name)
+                    if (name == "head") switchToBody()
+                    continue
+                }
+
+                if (trimmed.startsWith("!") || trimmed.startsWith("?")) continue
+                val name = trimmed.takeWhile { !it.isWhitespace() && it != '/' }.lowercase()
+                if (name.isEmpty() || !name[0].isLetter()) {
+                    appendText("<$rawTag>")
+                    continue
+                }
+                if (name == "html" || name == "head" || name == "body") {
+                    if (name == "body") switchToBody()
+                    continue
+                }
+
+                val headTag = name in setOf("base", "link", "meta", "title", "style")
+                if (inHead && !headTag) switchToBody()
+                if (inHead && name == "title") {
+                    // Title is retained in the head; the body switch occurs on </head>.
+                }
+                closeParagraphIfNeeded(name)
+                if (name == "li") closeOpen("li")
+                if (name == "dt" || name == "dd") { closeOpen("dt"); closeOpen("dd") }
+                if (name == "option") closeOpen("option")
+                if (name in headingTags) headingTags.forEach(::closeOpen)
+
+                val node = HtmlNode(name, attributes = parseAttributes(trimmed, name.length))
+                current().children += node
+                val selfClosing = trimmed.endsWith("/")
+                if (name !in voidTags && !selfClosing) stack += node
+            }
+
+            return HtmlDocument(document)
         }
 
-        private fun decodeEntities(value: String): String = value
-            .replace("&nbsp;", " ")
-            .replace("&amp;", "&")
-            .replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&quot;", "\"")
-            .replace("&#39;", "'")
+        private fun findTagEnd(source: String, start: Int): Int {
+            var quote: Char? = null
+            var i = start
+            while (i < source.length) {
+                val ch = source[i]
+                if (quote != null) {
+                    if (ch == quote) quote = null
+                } else when (ch) {
+                    '"', '\'' -> quote = ch
+                    '>' -> return i
+                }
+                i++
+            }
+            return -1
+        }
+
+        private fun decodeEntities(value: String): String {
+            val named = mapOf(
+                "amp" to "&", "lt" to "<", "gt" to ">", "quot" to "\"",
+                "apos" to "'", "nbsp" to "\u00A0", "copy" to "©", "reg" to "®",
+                "mdash" to "—", "ndash" to "–", "hellip" to "…"
+            )
+            return Regex("&(#x[0-9a-fA-F]+|#\\d+|[A-Za-z][A-Za-z0-9]+);?").replace(value) { match ->
+                val key = match.groupValues[1]
+                when {
+                    key.startsWith("#x", true) -> key.drop(2).toIntOrNull(16)?.let(::codePoint) ?: match.value
+                    key.startsWith("#") -> key.drop(1).toIntOrNull()?.let(::codePoint) ?: match.value
+                    else -> named[key] ?: match.value
+                }
+            }
+        }
+
+        private fun codePoint(value: Int): String =
+            if (value in 1..0x10FFFF && value !in 0xD800..0xDFFF) String(Character.toChars(value)) else "\uFFFD"
     }
 
     fun visibleBlocks(): List<HtmlNode> {
         val result = mutableListOf<HtmlNode>()
         fun walk(node: HtmlNode) {
-            if (node.tag == "script" || node.tag == "style" || node.tag == "head" || node.tag == "noscript") return
+            if (node.tag in setOf("script", "style", "head", "noscript", "title")) return
             if (node.tag == "#text") {
-                result.add(node)
+                if (node.text.isNotBlank()) result.add(node)
                 return
             }
-            if (node.tag in setOf("h1", "h2", "h3", "p", "li", "a", "button", "title", "pre")) {
+            if (node.tag in setOf("h1", "h2", "h3", "h4", "h5", "h6", "p", "li", "a", "button", "pre")) {
                 val text = buildString {
                     fun collect(n: HtmlNode) {
                         if (n.tag == "#text") append(n.text)
@@ -86,7 +236,16 @@ internal data class HtmlDocument(val root: HtmlNode) {
             }
             node.children.forEach(::walk)
         }
-        root.children.forEach(::walk)
+        walk(root)
         return result
+    }
+
+    fun findFirst(tag: String): HtmlNode? {
+        fun search(node: HtmlNode): HtmlNode? {
+            if (node.tag.equals(tag, true)) return node
+            node.children.forEach { child -> search(child)?.let { return it } }
+            return null
+        }
+        return search(root)
     }
 }
