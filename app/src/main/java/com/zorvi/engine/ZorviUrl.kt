@@ -16,7 +16,7 @@ internal class ZorviUrl(input: String, base: ZorviUrl? = null) {
             val baseUri = base?.parsed ?: throw IllegalArgumentException("Relative URL requires a base URL")
             baseUri.resolve(candidate)
         }).normalize()
-        require(resolved.isAbsolute && resolved.isHierarchical) { "URL must be absolute and hierarchical" }
+        require(resolved.isAbsolute && !resolved.isOpaque) { "URL must be absolute and hierarchical" }
         val scheme = resolved.scheme.lowercase()
         require(scheme == "http" || scheme == "https") { "Only HTTP and HTTPS URLs are supported" }
         require(!resolved.host.isNullOrBlank()) { "URL must contain a host" }
