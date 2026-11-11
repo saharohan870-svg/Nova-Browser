@@ -5,11 +5,13 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
-import android.graphics.drawable.Drawable
+
+/** Platform-neutral rectangle in CSS pixel coordinates. */
+internal data class ZorviRect(val left: Float, val top: Float, val right: Float, val bottom: Float)
 
 /** Immutable display-list commands. Coordinates are device-independent CSS pixels. */
 internal sealed interface ZorviPaintCommand {
-    data class FillRect(val bounds: RectF, val color: Int) : ZorviPaintCommand
+    data class FillRect(val bounds: ZorviRect, val color: Int) : ZorviPaintCommand
     data class DrawText(
         val text: String,
         val x: Float,
@@ -18,7 +20,7 @@ internal sealed interface ZorviPaintCommand {
         val sizePx: Float,
         val typeface: Typeface = Typeface.DEFAULT
     ) : ZorviPaintCommand
-    data class DrawBitmap(val bitmap: Bitmap, val destination: RectF, val alpha: Int = 255) : ZorviPaintCommand
+    data class DrawBitmap(val bitmap: Bitmap, val destination: ZorviRect, val alpha: Int = 255) : ZorviPaintCommand
 }
 
 /**
@@ -36,7 +38,7 @@ internal class ZorviGraphicsRenderer {
                     paint.isAntiAlias = true
                     paint.color = command.color
                     paint.style = Paint.Style.FILL
-                    canvas.drawRect(command.bounds, paint)
+                    canvas.drawRect(RectF(command.bounds.left, command.bounds.top, command.bounds.right, command.bounds.bottom), paint)
                 }
                 is ZorviPaintCommand.DrawText -> {
                     paint.reset()
@@ -51,7 +53,7 @@ internal class ZorviGraphicsRenderer {
                     paint.isAntiAlias = true
                     paint.isFilterBitmap = true
                     paint.alpha = command.alpha.coerceIn(0, 255)
-                    canvas.drawBitmap(command.bitmap, null, command.destination, paint)
+                    canvas.drawBitmap(command.bitmap, null, RectF(command.destination.left, command.destination.top, command.destination.right, command.destination.bottom), paint)
                 }
             }
         }
