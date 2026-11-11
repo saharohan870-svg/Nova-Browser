@@ -55,4 +55,22 @@ class ZorviHtmlDocumentTest {
         val document = HtmlDocument.parse("<p>start</p>" + "x".repeat(2_000_100))
         assertTrue(document.visibleBlocks().any { it.text == "start" })
     }
+    @Test fun preservesAttributesOnExplicitHtmlHeadAndBodyElements() {
+        val document = HtmlDocument.parse("""<html lang="en"><head data-head=yes><title>Page</title></head><body class="site" id=main><p>Content</p></body></html>""")
+        val html = document.findFirst("html")!!
+        val head = document.findFirst("head")!!
+        val body = document.findFirst("body")!!
+        assertEquals("en", html.attributes["lang"])
+        assertEquals("yes", head.attributes["data-head"])
+        assertEquals("site", body.attributes["class"])
+        assertEquals("main", body.attributes["id"])
+    }
+
+    @Test fun keepsScriptAndStyleRawTextInBodyInTheCorrectTreeNodes() {
+        val document = HtmlDocument.parse("<body><script>const x = '<p>not markup</p>';</script><style>.a > b { color: red }</style><p>Real text</p></body>")
+        assertEquals("const x = '<p>not markup</p>';", document.findFirst("script")!!.children.single().text)
+        assertEquals(".a > b { color: red }", document.findFirst("style")!!.children.single().text)
+        assertTrue(document.visibleBlocks().any { it.text == "Real text" })
+    }
+
 }
