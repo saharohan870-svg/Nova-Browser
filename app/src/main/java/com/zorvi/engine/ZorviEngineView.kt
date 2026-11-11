@@ -28,6 +28,7 @@ class ZorviEngineView(context: Context) : View(context) {
     private var styleSheet = ZorviCssStyleSheet("")
     private var pageUrl: URL? = null
     private var domDocument: ZorviDomDocument? = null
+    private val scriptRuntime = ZorviScriptRuntime()
     private val engineEvents = ZorviEventTarget()
     var onDomEvent: ((ZorviEngineEvent) -> Unit)? = null
     var onNavigate: ((String) -> Unit)? = null
@@ -65,14 +66,28 @@ class ZorviEngineView(context: Context) : View(context) {
                     }
                     val html = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
                     val document = HtmlDocument.parse(html)
-                    val css = Regex("(?is)<style[^>]*>(.*?)</style>").findAll(html).joinToString("
-") { it.groupValues[1] }
+                    val css = Regex("(?is)<style[^>]*>(.*?)</style>").findAll(html).joinToString("\\n") { it.groupValues[1] }
+                    val scripts = Regex("(?is)<script\\b([^>]*)>(.*?)</script\\s*>")
+                        .findAll(html)
+                        .filterNot { Regex("(?i)\\bsrc\\s*=").containsMatchIn(it.groupValues[1]) }
+                        .take(32)
+                        .map { it.groupValues[2].take(64 * 1024) }
+                        .filter { it.isNotBlank() }
+                        .toList()
                     val baseUrl = connection.url
                     val title = Regex("(?is)<title[^>]*>(.*?)</title>").find(html)?.groupValues?.get(1)?.trim().orEmpty()
                     post {
-                        blocks = document.visibleBlocks()
+                        domDocument = ZorviDomDocument.from(document)
+                        domDocument?.onMutation = {
+                            post {
+                                blocks = domDocument?.visibleBlocks().orEmpty()
+                                invalidate()
+                            }
+                        }
+                        blocks = domDocument?.visibleBlocks().orEmpty()
                         styleSheet = ZorviCssStyleSheet(css)
                         pageUrl = baseUrl
+                        domDocument?.let { scriptRuntime.loadDocument(it, scripts) }
                         onPageTitle?.invoke(title)
                         scrollYpx = 0f
                         requestLayout()
@@ -174,6 +189,7 @@ class ZorviEngineView(context: Context) : View(context) {
 
     override fun onDetachedFromWindow() {
         worker.shutdownNow()
+        scriptRuntime.close()
         super.onDetachedFromWindow()
     }
 }
