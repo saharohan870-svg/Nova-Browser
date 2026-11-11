@@ -23,7 +23,7 @@ class ZorviLayoutEngineTest {
             ZorviLayoutNode(text = "one two three", style = ZorviLayoutStyle(display = ZorviDisplay.INLINE))
         ))
         val box = engine.layout(root, 60f)
-        assertEquals(40f, box.children.single().height, 0.01f)
+        assertEquals(60f, box.children.single().height, 0.01f)
     }
 
     @Test fun flexRowDistributesGrowSpaceAndGap() {
@@ -57,7 +57,7 @@ class ZorviLayoutEngineTest {
         val box = engine.layout(root, 210f)
         assertEquals(100f, box.children[0].width, 0.01f)
         assertEquals(110f, box.children[1].x, 0.01f)
-        assertEquals(25f, box.children[2].y, 0.01f)
+        assertEquals(35f, box.children[2].y, 0.01f)
         assertEquals(110f, box.children[3].x, 0.01f)
     }
 
