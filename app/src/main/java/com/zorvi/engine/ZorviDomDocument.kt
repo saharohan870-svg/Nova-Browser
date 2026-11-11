@@ -64,6 +64,7 @@ internal class ZorviDomNode internal constructor(
 
     fun matchesSimpleSelector(selector: String): Boolean {
         val value = selector.trim()
+        if (value == "*") return true
         if (value.isEmpty() || value.any { it.isWhitespace() || it in ">,+~[]:" }) return false
         val tag = Regex("^[a-zA-Z][a-zA-Z0-9-]*").find(value)?.value
         val id = Regex("#([\\w-]+)").find(value)?.groupValues?.get(1)
@@ -103,12 +104,16 @@ internal class ZorviDomDocument internal constructor(val documentElement: ZorviD
 
     @Synchronized fun getElementById(id: String): ZorviDomNode? = documentElement.findById(id)
     @Synchronized fun getElementsByTagName(tag: String): List<ZorviDomNode> =
-        if (documentElement.tagName.equals(tag, true)) listOf(documentElement) else documentElement.findByTag(tag)
+        if (tag == "*") sequenceOf(documentElement).plus(documentElement.descendants()).toList()
+        else if (documentElement.tagName.equals(tag, true)) listOf(documentElement) else documentElement.findByTag(tag)
 
-    @Synchronized fun getElementsByClassName(className: String): List<ZorviDomNode> =
-        sequenceOf(documentElement).plus(documentElement.descendants())
-            .filter { node -> className.split(Regex("\\s+")).filter { it.isNotEmpty() }.all(node::hasClass) }
+    @Synchronized fun getElementsByClassName(className: String): List<ZorviDomNode> {
+        val requested = className.split(Regex("\\s+")).filter { it.isNotEmpty() }
+        if (requested.isEmpty()) return emptyList()
+        return sequenceOf(documentElement).plus(documentElement.descendants())
+            .filter { node -> requested.all(node::hasClass) }
             .toList()
+    }
 
     @Synchronized fun querySelector(selector: String): ZorviDomNode? =
         querySelectorAll(selector).firstOrNull()
