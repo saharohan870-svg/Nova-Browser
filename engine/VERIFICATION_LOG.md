@@ -22,7 +22,7 @@ A later phase must not hide, bypass or weaken a failing earlier test. Keep regre
 - This occurred before JUnit tests could execute. Therefore the Phase 0 test result at that point is **not run**, not passed.
 - Kotlin Gradle plugin was aligned to 2.4.10.
 - That exposed a Kotlin DSL migration requirement: the old `kotlinOptions.jvmTarget` setting is now an error. It was migrated to the `compilerOptions` DSL.
-- A new CI run is required to verify the toolchain fix and execute the tests.
+- The next compiler pass exposed public/internal type visibility leaks and missing explicit Kotlin coroutines classes. The DOM prototype types were made internal, the public engine event type was exposed consistently, and the Android coroutines dependency was added explicitly.\n- A new CI run is required to verify these fixes and execute the tests.
 
 ### HTML parser regression coverage
 
