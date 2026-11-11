@@ -33,7 +33,7 @@ A modern engine is a multi-year engineering effort for a small team, and potenti
 - **Security subsystem:** process/thread isolation strategy, origin model, same-origin policy, CSP, CORS, sandboxing, permissions and safe native bridges.
 - **Android platform layer:** input, accessibility, fonts, hardware acceleration, lifecycle, downloads, media, file selection and system integration.
 
-## Phases and exit criteria
+## Current progress (2026-11-11)\n\n- **Phase 0 — foundation:** architecture boundaries, dependency direction, lifecycle/resource-limit rules, JVM test dependency, parser unit-test suite, and CI unit-test execution are committed. Real-device baseline measurements remain pending because they require running the build on the target Android phone.\n- **Phase 1 — HTML parser:** initial bounded tokenizer/tree-builder implementation and parser regression tests are committed. It is not a complete WHATWG HTML parser; continue with standards fixtures, tokenizer edge cases, tree-construction modes and fuzzing.\n\n## Phases and exit criteria
 
 ### Phase 0 — Engineering foundation and architecture
 **Goal:** make the prototype maintainable before adding large subsystems.
