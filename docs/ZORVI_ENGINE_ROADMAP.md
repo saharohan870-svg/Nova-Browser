@@ -323,3 +323,16 @@ Do not set arbitrary tiny APK limits that force removal of required security or 
 “Modern-engine capable” means a documented, measurable level of standards support, security, performance and reliability across the target web-platform test suites and real-world sites. It does not mean that a feature list exists or that a few demonstration pages render.
 
 The roadmap is complete only when the engine has a published compatibility matrix, reproducible benchmarks, security review results, automated conformance coverage and release-quality Android integration.
+
+
+## Phase 7 implementation note (parallel foundation)
+
+Phase 7 has begun with graphics-layer components isolated from the in-progress layout, scripting, and Web API work in Phases 4–6:
+
+- An immutable paint-command model and Android Canvas raster backend for solid rectangles, text and bitmap drawing.
+- A platform-neutral CSS-pixel rectangle type so display-list geometry does not depend on Android graphics classes.
+- A deterministic generic-family font resolver using Android Typeface fallback.
+- A bounded bitmap decoder that rejects oversized encoded data and images above a 16-megapixel decoded-pixel budget, and selects a power-of-two sample size for target dimensions.
+- Initial unit tests for image sample sizing and display-list geometry.
+
+This is a foundation only. It is not yet wired to the document/layout pipeline, and does not provide SVG, Canvas web APIs, image resource fetching, text shaping, clipping/transform stacks, GPU compositing, or browser-grade image format coverage. Integration should wait until the parallel Phase 4–6 interfaces are known.
