@@ -13,7 +13,7 @@ class ZorviHtmlDocumentTest {
         assertEquals("head", html.children[0].tag)
         assertEquals("Example", html.children[0].children.single().text)
         assertEquals("body", html.children[1].tag)
-        assertEquals("Hello", html.children[1].children.single().children.single().text)
+        assertEquals("Hello", html.children[1].children.single().text)
     }
 
     @Test fun parsesQuotedAndUnquotedAttributesAndDecodesEntities() {
