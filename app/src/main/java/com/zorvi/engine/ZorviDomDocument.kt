@@ -115,4 +115,4 @@ internal class ZorviDomDocument internal constructor(val documentElement: ZorviD
     }
 }
 
-data class ZorviDomEvent(val type: String, val target: ZorviDomNode)
+internal data class ZorviDomEvent(val type: String, val target: ZorviDomNode)
