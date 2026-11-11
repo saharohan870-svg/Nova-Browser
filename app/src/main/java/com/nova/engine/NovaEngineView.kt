@@ -25,6 +25,8 @@ class NovaEngineView(context: Context) : View(context) {
     private var links: List<Pair<FloatArray, String>> = emptyList()
     private var scrollYpx = 0f
     private var documentHeight = 0f
+    private var styleSheet = NovaCssStyleSheet("")
+    private var pageUrl: URL? = null
     var onNavigate: ((String) -> Unit)? = null
     var onPageTitle: ((String) -> Unit)? = null
     var onLoadError: ((String) -> Unit)? = null
@@ -56,9 +58,13 @@ class NovaEngineView(context: Context) : View(context) {
                     }
                     val html = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
                     val document = HtmlDocument.parse(html)
+                    val css = Regex("(?is)<style[^>]*>(.*?)</style>").findAll(html).joinToString("\\n") { it.groupValues[1] }
+                    val baseUrl = connection.url
                     val title = Regex("(?is)<title[^>]*>(.*?)</title>").find(html)?.groupValues?.get(1)?.trim().orEmpty()
                     post {
                         blocks = document.visibleBlocks()
+                        styleSheet = NovaCssStyleSheet(css)
+                        pageUrl = baseUrl
                         onPageTitle?.invoke(title)
                         scrollYpx = 0f
                         requestLayout()
@@ -77,43 +83,57 @@ class NovaEngineView(context: Context) : View(context) {
         super.onDraw(canvas)
         canvas.drawColor(Color.WHITE)
         links = emptyList()
-        var y = 24f - scrollYpx
+        var y = 16f - scrollYpx
         val hitTargets = mutableListOf<Pair<FloatArray, String>>()
         blocks.forEach { node ->
             val text = node.text.ifEmpty { node.children.joinToString(" ") { it.text } }
             if (text.isBlank()) return@forEach
-            val heading = node.tag in setOf("h1", "h2", "h3", "title")
-            val size = when (node.tag) {
-                "h1" -> 28f
-                "h2" -> 23f
-                "h3" -> 20f
-                "pre" -> 14f
-                else -> 17f
+            val style = styleSheet.styleFor(node)
+            if (style.display == "none") return@forEach
+            val left = 16f + style.padding
+            val right = width - 16f - style.padding
+            y += style.marginTop
+            val size = style.fontSizeSp * resources.displayMetrics.scaledDensity
+            paint.color = style.backgroundColor
+            if (style.backgroundColor != Color.TRANSPARENT) {
+                canvas.drawRect(16f, y - size, width - 16f, y + size * 0.45f + style.padding * 2, paint)
             }
-            paint.color = if (node.tag == "a") Color.rgb(20, 90, 190) else Color.rgb(30, 30, 30)
+            paint.color = style.color
             paint.textSize = size
-            paint.typeface = if (heading) Typeface.create("sans-serif", Typeface.BOLD) else Typeface.create("sans-serif", Typeface.NORMAL)
-            val maxWidth = max(80f, width - 32f)
+            paint.typeface = if (style.bold) Typeface.create("sans-serif", Typeface.BOLD) else Typeface.create("sans-serif", Typeface.NORMAL)
+            val maxWidth = max(80f, right - left)
             val words = text.split(Regex("\\s+"))
             var line = ""
             val lineHeight = size * 1.45f
+            var firstLineY = y
+            fun drawLine(value: String) {
+                val measured = paint.measureText(value)
+                val x = when (style.textAlign) {
+                    "center" -> (width - measured) / 2f
+                    "right" -> right - measured
+                    else -> left
+                }
+                canvas.drawText(value, x, y, paint)
+                y += lineHeight
+            }
             words.forEach { word ->
                 val candidate = if (line.isEmpty()) word else "$line $word"
                 if (paint.measureText(candidate) > maxWidth && line.isNotEmpty()) {
-                    canvas.drawText(line, 16f, y, paint)
-                    y += lineHeight
+                    drawLine(line)
                     line = word
                 } else line = candidate
             }
             if (line.isNotEmpty()) {
-                canvas.drawText(line, 16f, y, paint)
+                val before = y
+                drawLine(line)
                 if (node.tag == "a") {
                     val href = node.attributes["href"].orEmpty()
-                    if (href.isNotBlank()) hitTargets.add(Pair(floatArrayOf(8f, y - size, width - 8f, y + 6f), href))
+                    if (href.isNotBlank()) {
+                        hitTargets.add(Pair(floatArrayOf(left, firstLineY - size, right, y + 4f), href))
+                    }
                 }
-                y += lineHeight
             }
-            y += if (heading) 18f else 12f
+            y += style.padding + style.marginBottom
         }
         links = hitTargets
         documentHeight = y + scrollYpx
@@ -126,8 +146,8 @@ class NovaEngineView(context: Context) : View(context) {
                 val y = event.y + scrollYpx
                 val hit = links.firstOrNull { y >= it.first[1] && y <= it.first[3] && event.x >= it.first[0] && event.x <= it.first[2] }
                 if (hit != null) {
-                    val destination = runCatching { URL(URL("https://invalid.local/"), hit.second).toString() }.getOrNull()
-                    if (destination != null && destination.startsWith("https://") || destination?.startsWith("http://") == true) {
+                    val destination = runCatching { URL(pageUrl, hit.second).toString() }.getOrNull()
+                    if (destination != null && (destination.startsWith("https://") || destination.startsWith("http://"))) {
                         onNavigate?.invoke(destination)
                     }
                 }
