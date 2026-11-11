@@ -11,9 +11,9 @@ class ZorviHtmlDocumentTest {
         val html = document.root.children.single()
         assertEquals("html", html.tag)
         assertEquals("head", html.children[0].tag)
-        assertEquals("Example", html.children[0].children.single().text)
+        assertEquals("Example", document.textContent(html.children[0].children.single()))
         assertEquals("body", html.children[1].tag)
-        assertEquals("Hello", html.children[1].children.single().text)
+        assertEquals("Hello", document.textContent(html.children[1].children.single()))
     }
 
     @Test fun parsesQuotedAndUnquotedAttributesAndDecodesEntities() {
