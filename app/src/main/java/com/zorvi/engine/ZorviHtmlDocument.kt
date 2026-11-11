@@ -53,11 +53,11 @@ internal data class HtmlDocument(val root: HtmlNode) {
                 stack += html
                 stack += body
             }
-            fun appendText(value: String, allowInHead: Boolean = false) {
+            fun appendText(value: String, allowInHead: Boolean = false, decode: Boolean = true) {
                 if (value.isEmpty()) return
                 if (inHead && value.isNotBlank() && !allowInHead) switchToBody()
                 val parent = current()
-                val decoded = decodeEntities(value)
+                val decoded = if (decode) decodeEntities(value) else value
                 val last = parent.children.lastOrNull()
                 if (last?.tag == "#text") {
                     parent.children[parent.children.lastIndex] = last.copy(text = last.text + decoded)
@@ -107,9 +107,13 @@ internal data class HtmlDocument(val root: HtmlNode) {
             while (cursor < input.length) {
                 val parent = current()
                 if (parent.tag in rawTextTags) {
-                    val closeStart = input.indexOf("</${parent.tag}", cursor, ignoreCase = true)
+                    val closeStart = findRawTextEndTag(input, parent.tag, cursor)
                     val end = if (closeStart < 0) input.length else closeStart
-                    appendText(input.substring(cursor, end), allowInHead = true)
+                    appendText(
+                        input.substring(cursor, end),
+                        allowInHead = true,
+                        decode = parent.tag !in setOf("script", "style")
+                    )
                     cursor = end
                     if (cursor >= input.length) break
                 }
@@ -186,6 +190,17 @@ internal data class HtmlDocument(val root: HtmlNode) {
             }
 
             return HtmlDocument(document)
+        }
+
+        private fun findRawTextEndTag(source: String, tag: String, start: Int): Int {
+            var candidate = source.indexOf("</$tag", start, ignoreCase = true)
+            while (candidate >= 0) {
+                val afterName = candidate + tag.length + 2
+                if (afterName >= source.length || source[afterName].isWhitespace() ||
+                    source[afterName] == '>' || source[afterName] == '/') return candidate
+                candidate = source.indexOf("</$tag", afterName, ignoreCase = true)
+            }
+            return -1
         }
 
         private fun findTagEnd(source: String, start: Int): Int {
