@@ -25,27 +25,23 @@ class HtmlDomParser {
                 index = if (end < 0) html.length else end + 3
                 continue
             }
-
             if (html[index] != '<') {
                 val next = html.indexOf('<', index).let { if (it < 0) html.length else it }
                 stack.last().appendText(decodeEntities(html.substring(index, next)))
                 index = next
                 continue
             }
-
             if (html.startsWith("<!", index) || html.startsWith("<?", index)) {
                 val end = html.indexOf('>', index + 2)
                 index = if (end < 0) html.length else end + 1
                 continue
             }
-
             if (html.startsWith("</", index)) {
                 val end = html.indexOf('>', index + 2)
                 if (end < 0) break
                 val rawName = html.substring(index + 2, end).trim().takeWhile { !it.isWhitespace() && it != '/' }
                 if (rawName.isNotEmpty()) {
-                    val name = rawName.lowercase()
-                    val matching = stack.indexOfLast { it.tagName == name }
+                    val matching = stack.indexOfLast { it.tagName == rawName.lowercase() }
                     if (matching > 0) while (stack.size > matching) stack.removeAt(stack.lastIndex)
                 }
                 index = end + 1
@@ -58,7 +54,6 @@ class HtmlDomParser {
                 index++
                 continue
             }
-
             val (tag, attrs, selfClosing, afterTag) = parsed
             autoCloseForStartTag(stack, tag)
             val element = DomElement(tag, attrs)
@@ -66,7 +61,7 @@ class HtmlDomParser {
             index = afterTag
 
             if (tag in rawTextElements && !selfClosing) {
-                val closePattern = Regex("</\\s*\${Regex.escape(tag)}\\s*>", RegexOption.IGNORE_CASE)
+                val closePattern = Regex("</\\s*" + Regex.escape(tag) + "\\s*>", RegexOption.IGNORE_CASE)
                 val close = closePattern.find(html, index)
                 if (close == null) {
                     element.appendText(html.substring(index))
@@ -97,17 +92,14 @@ class HtmlDomParser {
         val tag = nameMatch.value.lowercase()
         cursor = nameMatch.range.last + 1
         val attrs = linkedMapOf<String, String>()
-        var selfClosing = false
 
         while (cursor < source.length) {
             while (cursor < source.length && source[cursor].isWhitespace()) cursor++
             if (cursor >= source.length) break
-            if (source[cursor] == '>') return StartTag(tag, attrs, selfClosing, cursor + 1)
+            if (source[cursor] == '>') return StartTag(tag, attrs, false, cursor + 1)
             if (source[cursor] == '/' && cursor + 1 < source.length && source[cursor + 1] == '>') {
-                selfClosing = true
                 return StartTag(tag, attrs, true, cursor + 2)
             }
-
             val attrStart = cursor
             while (cursor < source.length &&
                 !source[cursor].isWhitespace() && source[cursor] !in setOf('=', '>', '/')) cursor++
@@ -138,7 +130,7 @@ class HtmlDomParser {
                 attrs[attrName] = decodeEntities(value)
             }
         }
-        return StartTag(tag, attrs, selfClosing, source.length)
+        return StartTag(tag, attrs, false, source.length)
     }
 
     private fun autoCloseForStartTag(stack: MutableList<DomElement>, incoming: String) {
