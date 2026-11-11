@@ -24,8 +24,6 @@ class NovaDocumentPipeline(
     fun process(html: String): EngineDocument {
         val dom = parser.parse(html)
         val styleEngine = CssStyleEngine()
-
-        // Load inline style blocks in document order. External stylesheets are not fetched yet.
         dom.descendants(includeSelf = true)
             .filter { it.tagName == "style" }
             .forEach { styleEngine.addStylesheet(it.textContent) }
@@ -41,9 +39,7 @@ class NovaDocumentPipeline(
         }
         compute(dom, null)
 
-        val accessibilityRoot = AccessibilityTreeBuilder().build(
-            StyledAccessibleElement(dom, styles)
-        )
+        val accessibilityRoot = AccessibilityTreeBuilder().build(StyledAccessibleElement(dom, styles))
         return EngineDocument(dom, styles, accessibilityRoot)
     }
 
@@ -71,7 +67,7 @@ class NovaDocumentPipeline(
                 val merged = element.attributes.toMutableMap()
                 val style = styles[element]?.asMap().orEmpty()
                 if (style.isNotEmpty()) {
-                    merged["style"] = style.entries.joinToString(";") { "\${it.key}:\${it.value}" }
+                    merged["style"] = style.entries.joinToString(";") { it.key + ":" + it.value }
                 }
                 return merged
             }
