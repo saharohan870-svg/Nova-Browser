@@ -1,4 +1,4 @@
-# Nova Browser
+# Zorvi Browser
 
 An Android browser prototype with a Chrome-inspired interface and Chromium-based Android WebView engine.
 
