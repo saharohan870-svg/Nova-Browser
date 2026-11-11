@@ -351,3 +351,17 @@ The networking subsystem now has an initial, isolated implementation:
 - Local HTTP regression tests for response bodies/headers, redirects, size limits, cache freshness and no-store behavior.
 
 This is not Phase 8 completion. HTTP/2, full cookie semantics (including SameSite), cache validators/revalidation (ETag/Last-Modified), CORS enforcement, mixed-content/referrer policy, streaming consumer APIs, resource priority/preload scheduling, and Android-device TLS/cancellation verification remain open. The current transport is HTTP/1.1; HTTP/2/3 support must be added only with a tested dependency/transport decision. The loader is not yet connected to HTML subresource discovery or the renderer. Certificate failures must continue to fail closed.
+
+
+## Phase 12 implementation note (first browser integration slice)
+
+An explicit experimental Zorvi page path is now present in the Android browser shell:
+
+- The main browser toolbar has an **Zorvi Engine** action that opens the current address in a dedicated page Activity.
+- The dedicated page host provides address/search input, Go, reload, back navigation, page title, and a visible “Zorvi Engine · Experimental renderer” label.
+- This Activity creates and hosts `ZorviEngineView` directly and does not instantiate Android WebView. The existing WebView-backed shell remains a separate compatibility path and is not misrepresented as Zorvi.
+- Zorvi page navigation now uses the bounded Phase 8 HTTP client, platform TLS validation, response-size limits, and HTML content-type checks.
+- A navigation generation token prevents stale responses from replacing a newer page; the active network call is cancelled when navigating again or detaching the renderer.
+- Basic touch-drag scrolling is enabled in the engine view.
+
+This is an integration prototype, not Phase 12 completion. The renderer still displays a limited text-oriented HTML subset; external CSS, scripts, images and fonts are not yet fetched/applied as a complete page pipeline. The layout engine and graphics display-list are not yet the source of geometry/painting in this view. Per-tab Zorvi lifecycle, tabs/history/bookmarks/downloads integration, page permissions/security indicators, renderer crash recovery, and a compatibility switch within each tab remain open. Do not use this prototype as a secure general-purpose daily browser or claim broad website compatibility.
