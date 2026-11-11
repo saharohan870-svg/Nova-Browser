@@ -50,3 +50,14 @@ The parser remains a deliberately incomplete HTML parser. It does not yet implem
 - Malformed-input fuzz/regression suite is green.
 - No regressions in DOM/CSS tests from earlier work.
 - The parser API is stable enough for the next DOM milestone.
+
+## Phase 2 — DOM and event model (initial implementation)
+
+- Added simple DOM class lookup and simple-selector query APIs, including selector groups and wildcard handling for element nodes.
+- Added capture/target/bubble dispatch, one-time listeners, listener removal, propagation controls and cancelable-event default prevention.
+- Added regression tests for selector lookup, node parent links, cycle prevention, event order, bubbling, once listeners and cancellation.
+- CI experiments exposed two test/implementation issues: an HTML parser assertion read text from the wrong tree level, and the document root was omitted from the event capture path. Both were corrected.
+- The ten-pass CI experiment was stopped as requested; CI has been returned to one test/build pass per commit.
+- **Current candidate:** `e3e98309403c76a676a496dea712cbc72ad4a905`
+- **Verification:** pending CI for this candidate. Do not mark Phase 2 complete yet.
+- **Scope note:** selector support is intentionally limited to simple tag, ID, class, combined simple selectors, comma groups and `*`; combinators, attribute selectors and pseudo-classes remain future work.
