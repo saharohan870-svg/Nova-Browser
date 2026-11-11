@@ -33,7 +33,15 @@ jobs:
       - name: Install required Android SDK packages
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - name: Build debug APK
-        run: gradle testDebugUnitTest assembleDebug --stacktrace
+        run: gradle assembleDebug --stacktrace
+      - name: Run unit tests 10 times
+        shell: bash
+        run: |
+          set -euo pipefail
+          for run in {1..10}; do
+            echo "===== Zorvi unit test pass ${run}/10 ====="
+            gradle testDebugUnitTest --rerun-tasks --stacktrace
+          done
       - name: Check APK download size
         run: |
           APK="app/build/outputs/apk/debug/app-debug.apk"
