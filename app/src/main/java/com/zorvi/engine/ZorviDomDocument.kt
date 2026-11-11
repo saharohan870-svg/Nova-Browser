@@ -71,16 +71,14 @@ internal class ZorviDomNode internal constructor(
         val value = selector.trim()
         if (tagName.startsWith("#")) return false
         if (value == "*") return true
-        if (value.isEmpty() || value.any { it.isWhitespace() || it in ">,+~[]:" }) return false
-        val tag = Regex("^[a-zA-Z][a-zA-Z0-9-]*").find(value)?.value
-        val id = Regex("#([\\w-]+)").find(value)?.groupValues?.get(1)
-        val classes = Regex("\\.([\\w-]+)").findAll(value).map { it.groupValues[1] }.toList()
-        val consumed = (tag?.length ?: 0) +
-            Regex("#[\\w-]+").findAll(value).sumOf { it.value.length } +
-            Regex("\\.[\\w-]+").findAll(value).sumOf { it.value.length }
-        return consumed == value.length &&
-            (tag == null || tag.equals(tagName, ignoreCase = true)) &&
-            (id == null || attributes["id"] == id) &&
+        val pattern = Regex("^(?:([a-zA-Z][a-zA-Z0-9-]*))?(?:#([\\\\w-]+))?((?:\\\\.[\\\\w-]+)*)$")
+        val match = pattern.matchEntire(value) ?: return false
+        if (match.value.isEmpty() || match.groupValues.drop(1).all { it.isEmpty() }) return false
+        val tag = match.groupValues[1]
+        val id = match.groupValues[2]
+        val classes = Regex("\\\\.([\\\\w-]+)").findAll(match.groupValues[3]).map { it.groupValues[1] }
+        return (tag.isEmpty() || tag.equals(tagName, ignoreCase = true)) &&
+            (id.isEmpty() || attributes["id"] == id) &&
             classes.all(::hasClass)
     }
 
