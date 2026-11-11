@@ -4,7 +4,7 @@ package com.zorvi.engine
  * A small DOM-like tree and mutation/event model for Zorvi Engine.
  *
  * This is an internal prototype API, not a complete WHATWG DOM implementation.
- * JavaScript bindings and standards-compliant event propagation are later work.
+ * The document exposes a deliberately small synchronized bridge to the JavaScript runtime; standards-compliant DOM behavior is later work.
  */
 class ZorviDomNode internal constructor(
     val tagName: String,
