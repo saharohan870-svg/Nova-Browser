@@ -28,4 +28,5 @@ android {
 dependencies {
     // Standalone QuickJS runtime; not Chromium/V8 or Android System WebView.
     implementation("io.github.dokar3:quickjs-kt-android:1.0.15")
+    testImplementation("junit:junit:4.13.2")
 }
