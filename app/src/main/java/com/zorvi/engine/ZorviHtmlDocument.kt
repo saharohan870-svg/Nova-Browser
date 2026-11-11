@@ -42,7 +42,7 @@ internal data class HtmlDocument(val root: HtmlNode) {
             html.children += head
             html.children += body
 
-            val stack = mutableListOf(html)
+            val stack = mutableListOf(html, head)
             var inHead = true
             var cursor = 0
 
@@ -55,6 +55,7 @@ internal data class HtmlDocument(val root: HtmlNode) {
             }
             fun appendText(value: String) {
                 if (value.isEmpty()) return
+                if (inHead && value.isNotBlank()) switchToBody()
                 val parent = current()
                 val decoded = decodeEntities(value)
                 val last = parent.children.lastOrNull()
@@ -159,7 +160,7 @@ internal data class HtmlDocument(val root: HtmlNode) {
                     continue
                 }
 
-                val headTag = name in setOf("base", "link", "meta", "title", "style")
+                val headTag = name in setOf("base", "link", "meta", "title", "style", "script", "noscript")
                 if (inHead && !headTag) switchToBody()
                 if (inHead && name == "title") {
                     // Title is retained in the head; the body switch occurs on </head>.
