@@ -1,5 +1,10 @@
 package com.zorvi.engine
 
+private val ZORVI_VOID_TAGS = setOf(
+    "area", "base", "br", "col", "embed", "hr", "img", "input",
+    "link", "meta", "param", "source", "track", "wbr"
+)
+
 /**
  * Deliberately small DOM/event model. It is not a complete WHATWG DOM.
  * Tree ownership is maintained by appendChild/removeChild; document event
@@ -170,7 +175,7 @@ internal class ZorviDomDocument internal constructor(val documentElement: ZorviD
             " ${name.lowercase()}=\"${escapeAttribute(value)}\""
         }
         val opening = "<${tag}${attributes}>"
-        if (tag in VOID_TAGS) return opening
+        if (tag in ZORVI_VOID_TAGS) return opening
         return opening + escapeText(node.textContent) +
             node.children.joinToString("") { serializeNode(it) } + "</${tag}>"
     }
@@ -180,13 +185,6 @@ internal class ZorviDomDocument internal constructor(val documentElement: ZorviD
 
     private fun escapeAttribute(value: String): String =
         escapeText(value).replace("\"", "&quot;")
-
-    private companion object {
-        val VOID_TAGS = setOf(
-            "area", "base", "br", "col", "embed", "hr", "img", "input",
-            "link", "meta", "param", "source", "track", "wbr"
-        )
-    }
 
     fun addEventListener(type: String, listener: (ZorviDomEvent) -> Unit) =
         addEventListener(type, capture = false, once = false, listener = listener)
