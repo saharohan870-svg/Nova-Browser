@@ -145,7 +145,7 @@ internal class ZorviDomDocument internal constructor(val documentElement: ZorviD
         }
         val event = ZorviDomEvent(type.lowercase(), target, bubbles, cancelable)
 
-        for (node in path.asReversed().drop(1)) {
+        for (node in path.asReversed().dropLast(1)) {
             if (event.propagationStopped) break
             event.currentTarget = node
             event.eventPhase = ZorviDomEvent.CAPTURING_PHASE
