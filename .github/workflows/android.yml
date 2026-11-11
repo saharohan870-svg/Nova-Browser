@@ -1,10 +1,19 @@
-name: Android Debug APK
+name: Nova Android Prototype APK
+
 on:
   push:
-    branches: [ main ]
+    branches: [ main, chromium-engine-migration ]
+    paths:
+      - 'app/**'
+      - 'gradle/**'
+      - '*.gradle*'
+      - 'settings.gradle*'
+      - '.github/workflows/android.yml'
   workflow_dispatch:
+
 permissions:
   contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -25,8 +34,15 @@ jobs:
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - name: Build debug APK
         run: gradle assembleDebug --stacktrace
+      - name: Enforce 100 MB download ceiling
+        run: |
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK"
+          SIZE=$(stat -c%s "$APK")
+          echo "APK bytes: $SIZE"
+          test "$SIZE" -lt 100000000
       - uses: actions/upload-artifact@v4
         with:
-          name: nova-browser-debug-apk
+          name: nova-browser-webview-prototype-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
