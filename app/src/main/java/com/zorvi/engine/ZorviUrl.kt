@@ -14,7 +14,12 @@ internal class ZorviUrl(input: String, base: ZorviUrl? = null) {
             .getOrElse { throw IllegalArgumentException("Invalid URL", it) }
         val resolved = (if (candidate.isAbsolute) candidate else {
             val baseUri = base?.parsed ?: throw IllegalArgumentException("Relative URL requires a base URL")
-            baseUri.resolve(candidate)
+            if (candidate.rawPath.isNullOrEmpty() && candidate.rawQuery != null) {
+                val fragment = candidate.rawFragment?.let { "#$it" }.orEmpty()
+                URI("${baseUri.scheme}://${baseUri.rawAuthority}${baseUri.rawPath}? ${candidate.rawQuery}$fragment".replace("? ", "?"))
+            } else {
+                baseUri.resolve(candidate)
+            }
         }).normalize()
         require(resolved.isAbsolute && !resolved.isOpaque) { "URL must be absolute and hierarchical" }
         val scheme = resolved.scheme.lowercase()
