@@ -64,6 +64,7 @@ internal class ZorviDomNode internal constructor(
 
     fun matchesSimpleSelector(selector: String): Boolean {
         val value = selector.trim()
+        if (tagName.startsWith("#")) return false
         if (value == "*") return true
         if (value.isEmpty() || value.any { it.isWhitespace() || it in ">,+~[]:" }) return false
         val tag = Regex("^[a-zA-Z][a-zA-Z0-9-]*").find(value)?.value
@@ -104,7 +105,7 @@ internal class ZorviDomDocument internal constructor(val documentElement: ZorviD
 
     @Synchronized fun getElementById(id: String): ZorviDomNode? = documentElement.findById(id)
     @Synchronized fun getElementsByTagName(tag: String): List<ZorviDomNode> =
-        if (tag == "*") sequenceOf(documentElement).plus(documentElement.descendants()).toList()
+        if (tag == "*") documentElement.descendants().filterNot { it.tagName.startsWith("#") }.toList()
         else if (documentElement.tagName.equals(tag, true)) listOf(documentElement) else documentElement.findByTag(tag)
 
     @Synchronized fun getElementsByClassName(className: String): List<ZorviDomNode> {
@@ -121,7 +122,7 @@ internal class ZorviDomDocument internal constructor(val documentElement: ZorviD
     @Synchronized fun querySelectorAll(selector: String): List<ZorviDomNode> {
         val groups = selector.split(',').map(String::trim)
         if (groups.isEmpty() || groups.any { it.isEmpty() }) return emptyList()
-        return sequenceOf(documentElement).plus(documentElement.descendants())
+        return documentElement.descendants()
             .filter { node -> groups.any(node::matchesSimpleSelector) }
             .toList()
     }
