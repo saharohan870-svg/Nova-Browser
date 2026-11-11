@@ -22,7 +22,7 @@ internal class ZorviEventTarget {
     }
 }
 
-internal data class ZorviEngineEvent(
+data class ZorviEngineEvent(
     val type: String,
     val targetId: String? = null,
     val payload: String? = null
