@@ -8,11 +8,10 @@ import android.view.*
 import android.view.inputmethod.EditorInfo
 import android.webkit.*
 import android.widget.*
-import androidx.activity.ComponentActivity
 import org.json.JSONArray
 import java.net.URLEncoder
 
-class MainActivity : ComponentActivity() {
+class MainActivity : Activity() {
     private lateinit var root: LinearLayout
     private lateinit var address: EditText
     private lateinit var engine: Spinner
