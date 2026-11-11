@@ -365,3 +365,16 @@ An explicit experimental Zorvi page path is now present in the Android browser s
 - Basic touch-drag scrolling is enabled in the engine view.
 
 This is an integration prototype, not Phase 12 completion. The renderer still displays a limited text-oriented HTML subset; external CSS, scripts, images and fonts are not yet fetched/applied as a complete page pipeline. The layout engine and graphics display-list are not yet the source of geometry/painting in this view. Per-tab Zorvi lifecycle, tabs/history/bookmarks/downloads integration, page permissions/security indicators, renderer crash recovery, and a compatibility switch within each tab remain open. Do not use this prototype as a secure general-purpose daily browser or claim broad website compatibility.
+
+
+## Phase 10 implementation note (initial accessibility semantics slice)
+
+- Added a bounded semantic snapshot for native HTML headings, links, buttons, form controls, images and navigation/main landmarks.
+- Accessible names prefer `aria-label`, `alt`, associated `label[for]`, placeholder, title, then text content.
+- Native input types map to text-field, checkbox, radio-button, slider, spin-button and button roles; disabled state and heading level are retained.
+- Hidden subtrees, `aria-hidden=true`, and hidden inputs are excluded.
+- The experimental page view exposes a combined semantic page description through Android's standard View accessibility description.
+- Added four JVM tests for landmarks/headings/links, form labels, native control roles/disabled state, and hidden content.
+- Fixed the malformed single-quote trim in response charset parsing that blocked Kotlin compilation on the previous branch head.
+
+This is an initial accessibility foundation, not Phase 10 completion. The current renderer exposes one page-level accessibility description rather than individually navigable virtual nodes; TalkBack focus order/actions, editable form widgets and submission/validation, file upload, media playback/captions/fullscreen/autoplay, zoom/text scaling/selection/find-in-page, RTL/locale handling, printing/PDF and device-level accessibility verification remain open. The renderer still does not visually render or interact with most form controls.
