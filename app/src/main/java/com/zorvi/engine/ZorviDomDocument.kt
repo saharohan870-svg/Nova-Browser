@@ -50,10 +50,42 @@ class ZorviDomNode internal constructor(
 
 class ZorviDomDocument internal constructor(val documentElement: ZorviDomNode) {
     private val listeners = mutableMapOf<String, MutableList<(ZorviDomEvent) -> Unit>>()
+    @Volatile var onMutation: (() -> Unit)? = null
 
-    fun getElementById(id: String): ZorviDomNode? = documentElement.findById(id)
-    fun getElementsByTagName(tag: String): List<ZorviDomNode> =
+    @Synchronized fun getElementById(id: String): ZorviDomNode? = documentElement.findById(id)
+    @Synchronized fun getElementsByTagName(tag: String): List<ZorviDomNode> =
         if (documentElement.tagName.equals(tag, true)) listOf(documentElement) else documentElement.findByTag(tag)
+
+    @Synchronized fun hasElement(id: String): Boolean = documentElement.findById(id) != null
+
+    @Synchronized fun getTextById(id: String): String? = documentElement.findById(id)?.text()
+
+    @Synchronized fun setTextById(id: String, value: String) {
+        val node = documentElement.findById(id) ?: return
+        node.textContent = ""
+        node.children.clear()
+        if (value.isNotEmpty()) node.appendChild(ZorviDomNode("#text", value))
+        onMutation?.invoke()
+    }
+
+    @Synchronized fun getAttributeById(id: String, name: String): String? =
+        documentElement.findById(id)?.getAttribute(name)
+
+    @Synchronized fun setAttributeById(id: String, name: String, value: String) {
+        val node = documentElement.findById(id) ?: return
+        node.setAttribute(name, value)
+        onMutation?.invoke()
+    }
+
+    @Synchronized fun visibleBlocks(): List<HtmlNode> {
+        fun convert(node: ZorviDomNode): HtmlNode = HtmlNode(
+            tag = node.tagName,
+            text = node.textContent,
+            attributes = node.attributes.toMap(),
+            children = node.children.map(::convert).toMutableList()
+        )
+        return HtmlDocument(convert(documentElement)).visibleBlocks()
+    }
 
     fun addEventListener(type: String, listener: (ZorviDomEvent) -> Unit) {
         listeners.getOrPut(type.lowercase()) { mutableListOf() }.add(listener)
