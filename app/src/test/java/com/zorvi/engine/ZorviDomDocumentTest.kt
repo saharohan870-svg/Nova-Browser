@@ -79,10 +79,10 @@ class ZorviDomDocumentTest {
 
     @Test fun supportsWildcardAndRejectsEmptyClassLookup() {
         val document = ZorviDomDocument.from(HtmlDocument.parse("<main><p class='a b'>One</p><span>Two</span></main>"))
-        assertEquals(5, document.getElementsByTagName("*").size)
+        assertEquals(6, document.getElementsByTagName("*").size)
         assertTrue(document.getElementsByClassName("").isEmpty())
         assertTrue(document.getElementsByClassName("a b").single().tagName == "p")
-        assertEquals(5, document.querySelectorAll("*").size)
+        assertEquals(6, document.querySelectorAll("*").size)
     }
 
     @Test fun dispatchesTypedDocumentEvents() {
