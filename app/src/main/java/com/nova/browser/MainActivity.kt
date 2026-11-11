@@ -1,4 +1,4 @@
-package com.nova.browser
+package com.zorvi.browser
 
 import android.app.Activity
 import android.app.DownloadManager
@@ -38,7 +38,7 @@ class MainActivity : Activity() {
     private var privateMode = false
     private var dark = false
     private var fileCallback: android.webkit.ValueCallback<Array<Uri>>? = null
-    private val prefs by lazy { getSharedPreferences("nova", Context.MODE_PRIVATE) }
+    private val prefs by lazy { getSharedPreferences("zorvi", Context.MODE_PRIVATE) }
     private val engines = listOf("Google", "Bing", "DuckDuckGo", "Brave Search")
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -278,7 +278,7 @@ class MainActivity : Activity() {
         }.toMutableList()
         names.add("＋ New tab")
         AlertDialog.Builder(this)
-            .setTitle("Nova tabs")
+            .setTitle("Zorvi tabs")
             .setItems(names.toTypedArray()) { _, which ->
                 if (which == pages.size) newTab("https://www.google.com")
                 else { active = which; showOnlyActive(); updateTabs() }
