@@ -73,7 +73,7 @@ class ZorviDomDocumentTest {
 
         assertEquals(2, document.getElementsByClassName("note").size)
         assertEquals("first", document.querySelector("#first")?.getAttribute("id"))
-        assertEquals(2, document.querySelectorAll("p.note, a.selected").size)
+        assertEquals(3, document.querySelectorAll("p.note, a.selected").size)
         assertEquals(0, document.querySelectorAll("p > a").size)
     }
 
