@@ -157,6 +157,37 @@ internal class ZorviDomDocument internal constructor(val documentElement: ZorviD
         return HtmlDocument(convert(documentElement)).visibleBlocks()
     }
 
+    @Synchronized fun serialize(): String =
+        documentElement.children.joinToString("") { serializeNode(it) }
+
+    @Synchronized fun innerHtml(node: ZorviDomNode): String =
+        node.children.joinToString("") { serializeNode(it) }
+
+    private fun serializeNode(node: ZorviDomNode): String {
+        if (node.tagName == "#text") return escapeText(node.textContent)
+        val tag = node.tagName.lowercase()
+        val attributes = node.attributes.entries.joinToString("") { (name, value) ->
+            " ${name.lowercase()}=\"${escapeAttribute(value)}\""
+        }
+        val opening = "<${tag}${attributes}>"
+        if (tag in VOID_TAGS) return opening
+        return opening + escapeText(node.textContent) +
+            node.children.joinToString("") { serializeNode(it) } + "</${tag}>"
+    }
+
+    private fun escapeText(value: String): String =
+        value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    private fun escapeAttribute(value: String): String =
+        escapeText(value).replace("\"", "&quot;")
+
+    private companion object {
+        val VOID_TAGS = setOf(
+            "area", "base", "br", "col", "embed", "hr", "img", "input",
+            "link", "meta", "param", "source", "track", "wbr"
+        )
+    }
+
     fun addEventListener(type: String, listener: (ZorviDomEvent) -> Unit) =
         addEventListener(type, capture = false, once = false, listener = listener)
 
