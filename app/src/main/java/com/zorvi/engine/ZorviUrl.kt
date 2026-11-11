@@ -16,7 +16,7 @@ internal class ZorviUrl(input: String, base: ZorviUrl? = null) {
             val baseUri = base?.parsed ?: throw IllegalArgumentException("Relative URL requires a base URL")
             if (candidate.rawPath.isNullOrEmpty() && candidate.rawQuery != null) {
                 val fragment = candidate.rawFragment?.let { "#$it" }.orEmpty()
-                URI("${baseUri.scheme}://${baseUri.rawAuthority}${baseUri.rawPath}? ${candidate.rawQuery}$fragment".replace("? ", "?"))
+                URI("${baseUri.scheme}://${baseUri.rawAuthority}${baseUri.rawPath}?${candidate.rawQuery}$fragment")
             } else {
                 baseUri.resolve(candidate)
             }
