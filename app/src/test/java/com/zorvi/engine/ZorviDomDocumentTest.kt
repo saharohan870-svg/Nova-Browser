@@ -65,6 +65,18 @@ class ZorviDomDocumentTest {
         assertEquals("new", paragraph.text())
     }
 
+
+    @Test fun supportsClassLookupAndSimpleSelectorGroups() {
+        val document = ZorviDomDocument.from(
+            HtmlDocument.parse("<main><p id='first' class='note selected'>One</p><p class='note'>Two</p><a class='selected'>Link</a></main>")
+        )
+
+        assertEquals(2, document.getElementsByClassName("note").size)
+        assertEquals("first", document.querySelector("#first")?.getAttribute("id"))
+        assertEquals(2, document.querySelectorAll("p.note, a.selected").size)
+        assertEquals(0, document.querySelectorAll("p > a").size)
+    }
+
     @Test fun dispatchesTypedDocumentEvents() {
         val document = ZorviDomDocument.from(HtmlDocument.parse("<p id='x'>text</p>"))
         val target = document.getElementById("x")!!
