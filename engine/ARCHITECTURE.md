@@ -57,3 +57,8 @@ Initial parser input limit: 2,000,000 UTF-16 code units. This is a defensive pro
 ## Current prototype gaps
 
 No complete HTML5 tree construction, CSS layout engine, standards-compliant DOM/events, browser-grade JS APIs, resource loader, process isolation, storage partitioning, GPU compositor, or complete security model exists yet. Keep these gaps visible in docs and UI.
+
+
+## Networking implementation boundary (initial Phase 8 slice)
+
+The first networking implementation uses the Android/JVM `HttpURLConnection` stack and platform TLS trust store. It supports explicit HTTP redirects, gzip/deflate, bounded response bodies, per-loader memory caching, and a fixed-size background worker pool. It does not yet implement HTTP/2, complete cookie policy, CORS/mixed-content enforcement, cache revalidation, preload scheduling, or connection pooling. Do not expose this transport to arbitrary page scripts until origin and CORS enforcement is implemented and reviewed.
