@@ -16,7 +16,13 @@ class ZorviDomNode internal constructor(
         private set
 
     fun appendChild(child: ZorviDomNode) {
-        child.parent?.children?.remove(child)
+        require(child !== this) { "A node cannot be appended to itself" }
+        var ancestor: ZorviDomNode? = this
+        while (ancestor != null) {
+            require(ancestor !== child) { "Appending this node would create a cycle" }
+            ancestor = ancestor.parent
+        }
+        child.parent?.removeChild(child)
         child.parent = this
         children.add(child)
     }
@@ -63,7 +69,7 @@ class ZorviDomDocument internal constructor(val documentElement: ZorviDomNode) {
     @Synchronized fun setTextById(id: String, value: String) {
         val node = documentElement.findById(id) ?: return
         node.textContent = ""
-        node.children.clear()
+        node.children.toList().forEach(node::removeChild)
         if (value.isNotEmpty()) node.appendChild(ZorviDomNode("#text", value))
         onMutation?.invoke()
     }
@@ -87,13 +93,14 @@ class ZorviDomDocument internal constructor(val documentElement: ZorviDomNode) {
         return HtmlDocument(convert(documentElement)).visibleBlocks()
     }
 
-    fun addEventListener(type: String, listener: (ZorviDomEvent) -> Unit) {
+    @Synchronized fun addEventListener(type: String, listener: (ZorviDomEvent) -> Unit) {
         listeners.getOrPut(type.lowercase()) { mutableListOf() }.add(listener)
     }
 
     internal fun dispatch(type: String, target: ZorviDomNode) {
+        val callbacks = synchronized(this) { listeners[type.lowercase()]?.toList().orEmpty() }
         val event = ZorviDomEvent(type.lowercase(), target)
-        listeners[type.lowercase()]?.toList()?.forEach { it(event) }
+        callbacks.forEach { it(event) }
     }
 
     companion object {
