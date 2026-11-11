@@ -9,6 +9,7 @@ Nova Browser should become an Android browser built from a Chromium browser sour
 ## Upstream evaluated
 
 - Candidate base: [Cromite](https://github.com/uazo/cromite), an Android Chromium fork.
+- Initial upstream snapshot inspected on 2026-11-11: Cromite `master` commit `3724efc6ede3d2d94611c1fe71d1b090ebbb40a7`; its `build/RELEASE` file reports Chromium version `153.0.8010.37`. This is an investigation pin, not yet a validated Nova release pin.
 - Upstream README documents Android ARM64, ARM32 and x86_64 builds, Android 10+, built-in ad blocking/privacy work, and downloadable APK releases.
 - Cromite is GPL-3.0. A Nova fork must preserve applicable copyright/license notices, provide the corresponding source and modifications under the applicable GPL terms, and must not imply that Nova is an official Cromite build.
 - Upstream build guide: https://github.com/uazo/cromite/blob/master/docs/HOW_TO_BUILD.md
