@@ -44,7 +44,7 @@ class ZorviNetworkingTest {
                             else -> Quad(404, "Not Found", "", ByteArray(0))
                         }
                         val output = socket.getOutputStream()
-                        val head = "HTTP/1.1 $status $reason\r\n$headersContent-Length: ${body.size}\r\nConnection: close\r\n\r\n"
+                        val head = "HTTP/1.1 $status $reason\r\n${headers}Content-Length: ${body.size}\r\nConnection: close\r\n\r\n"
                         output.write(head.toByteArray(StandardCharsets.ISO_8859_1))
                         output.write(body)
                         output.flush()
