@@ -77,6 +77,14 @@ class ZorviDomDocumentTest {
         assertEquals(0, document.querySelectorAll("p > a").size)
     }
 
+    @Test fun supportsWildcardAndRejectsEmptyClassLookup() {
+        val document = ZorviDomDocument.from(HtmlDocument.parse("<main><p class='a b'>One</p><span>Two</span></main>"))
+        assertEquals(5, document.getElementsByTagName("*").size)
+        assertTrue(document.getElementsByClassName("").isEmpty())
+        assertTrue(document.getElementsByClassName("a b").single().tagName == "p")
+        assertEquals(5, document.querySelectorAll("*").size)
+    }
+
     @Test fun dispatchesTypedDocumentEvents() {
         val document = ZorviDomDocument.from(HtmlDocument.parse("<p id='x'>text</p>"))
         val target = document.getElementById("x")!!
