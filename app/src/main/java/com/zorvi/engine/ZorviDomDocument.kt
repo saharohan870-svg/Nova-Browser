@@ -71,12 +71,12 @@ internal class ZorviDomNode internal constructor(
         val value = selector.trim()
         if (tagName.startsWith("#")) return false
         if (value == "*") return true
-        val pattern = Regex("""^(?:([a-zA-Z][a-zA-Z0-9-]*))?(?:#([\\w-]+))?((?:\\.[\\w-]+)*)$""")
+        val pattern = Regex("""^(?:([a-zA-Z][a-zA-Z0-9-]*))?(?:#([\w-]+))?((?:\.[\w-]+)*)$""")
         val match = pattern.matchEntire(value) ?: return false
         if (match.value.isEmpty() || match.groupValues.drop(1).all { it.isEmpty() }) return false
         val tag = match.groupValues[1]
         val id = match.groupValues[2]
-        val classes = Regex("""\\.([\\w-]+)""").findAll(match.groupValues[3]).map { it.groupValues[1] }
+        val classes = Regex("""\.([\w-]+)""").findAll(match.groupValues[3]).map { it.groupValues[1] }
         return (tag.isEmpty() || tag.equals(tagName, ignoreCase = true)) &&
             (id.isEmpty() || attributes["id"] == id) &&
             classes.all(::hasClass)
