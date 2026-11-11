@@ -62,3 +62,16 @@ The parser remains a deliberately incomplete HTML parser. It does not yet implem
 - **Current candidate:** `6786d5630336697f1360114c57724249065a522b`
 - **Verification:** pending CI for this candidate. Do not mark Phase 2 complete yet.
 - **Scope note:** selector support is intentionally limited to simple tag, ID, class, combined simple selectors, comma groups and `*`; combinators, attribute selectors and pseudo-classes remain future work.
+
+
+## Phase 3 — CSS parser and initial cascade integration
+
+- Added `ZorviCssTokenizer` with bounded input and tokens for identifiers, at-keywords, hashes, strings, numbers, dimensions, percentages, whitespace and delimiters. Comments are skipped.
+- Added a recovering CSS style-rule parser that scans quoted strings, comments and nested function/bracket delimiters so semicolons and colons inside values do not split declarations.
+- The parser currently accepts ordinary style rules and comma-separated selector lists. At-rules are skipped; nested at-rule semantics are not implemented.
+- Replaced the stylesheet's brace/declaration regex parsing with parsed rule/declaration data. Existing limited property application and selector matching remain prototype-level.
+- Added four CSS parser/tokenizer regression tests.
+- **Candidate:** `480d8f6a86088639f109dcb1a3d1def3f44b1fd8` (documentation commit; implementation commits precede it).
+- **CI:** pending; no Phase 3 pass is claimed.
+- **Blocking earlier result:** Phase 2's selector-group test failed on the last completed recorded run (`43062022982`). The new CSS changes do not resolve or bypass that test. The current candidate must pass the full suite before this increment is considered verified.
+- **Known gaps:** no full CSS Syntax specification tokenizer, escaped identifier decoding, selector combinator/attribute/pseudo matching, nested at-rule evaluation, cascade origins/importance/inheritance/custom properties, media queries, computed-value resolution or full CSS value grammar.
