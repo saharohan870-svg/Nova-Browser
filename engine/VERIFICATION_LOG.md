@@ -54,10 +54,11 @@ The parser remains a deliberately incomplete HTML parser. It does not yet implem
 ## Phase 2 — DOM and event model (initial implementation)
 
 - Added simple DOM class lookup and simple-selector query APIs, including selector groups and wildcard handling for element nodes.
+- Added basic `innerHTML`/`outerHTML` serialization with escaping for text and attributes and correct void-element handling.
 - Added capture/target/bubble dispatch, one-time listeners, listener removal, propagation controls and cancelable-event default prevention.
 - Added regression tests for selector lookup, node parent links, cycle prevention, event order, bubbling, once listeners and cancellation.
-- CI experiments exposed two test/implementation issues: an HTML parser assertion read text from the wrong tree level, and the document root was omitted from the event capture path. Both were corrected.
+- CI experiments exposed test/implementation issues: an HTML parser assertion read text from the wrong tree level; the document root was omitted from the event capture path; and the first selector matcher was insufficiently reliable. These were corrected, with stricter selector parsing and regression tests.
 - The ten-pass CI experiment was stopped as requested; CI has been returned to one test/build pass per commit.
-- **Current candidate:** `e3e98309403c76a676a496dea712cbc72ad4a905`
+- **Current candidate:** `6786d5630336697f1360114c57724249065a522b`
 - **Verification:** pending CI for this candidate. Do not mark Phase 2 complete yet.
 - **Scope note:** selector support is intentionally limited to simple tag, ID, class, combined simple selectors, comma groups and `*`; combinators, attribute selectors and pseudo-classes remain future work.
