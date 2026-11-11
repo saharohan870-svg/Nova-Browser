@@ -186,7 +186,7 @@ internal class ZorviLayoutEngine(
                 else -> 0f
             }
             val box = if (row) {
-                layoutNode(child, cursor, top + crossOffset, mainSize, crossSize)
+                layoutNode(child.copy(style = child.style.copy(width = mainSize)), cursor, top + crossOffset, mainSize, crossSize)
             } else {
                 layoutNode(child, left + crossOffset, cursor, crossSize, mainSize)
             }
