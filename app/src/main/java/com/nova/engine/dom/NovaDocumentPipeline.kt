@@ -65,6 +65,9 @@ class NovaDocumentPipeline(
         override val attributes: Map<String, String>
             get() {
                 val merged = element.attributes.toMutableMap()
+                if (element.tagName in setOf("head", "title", "style", "script", "meta", "link")) {
+                    merged["hidden"] = ""
+                }
                 val style = styles[element]?.asMap().orEmpty()
                 if (style.isNotEmpty()) {
                     merged["style"] = style.entries.joinToString(";") { it.key + ":" + it.value }
