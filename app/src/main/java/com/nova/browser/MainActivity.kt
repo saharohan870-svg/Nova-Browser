@@ -1,29 +1,44 @@
 package com.nova.browser
 
-import android.app.*
-import android.os.Bundle
-import android.content.*
+import android.app.Activity
+import android.app.DownloadManager
+import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
-import android.view.*
+import android.os.Bundle
+import android.view.Gravity
+import android.view.View
 import android.view.inputmethod.EditorInfo
-import android.webkit.*
+import android.webkit.CookieManager
+import android.webkit.DownloadListener
+import android.webkit.SslErrorHandler
+import android.webkit.URLUtil
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.*
+import android.app.AlertDialog
+import android.database.Cursor
 import org.json.JSONArray
+import java.io.ByteArrayInputStream
 import java.net.URLEncoder
 import java.util.Locale
 
 class MainActivity : Activity() {
     private lateinit var root: LinearLayout
     private lateinit var address: EditText
-    private lateinit var engine: Spinner
     private lateinit var tabsLabel: TextView
     private val pages = mutableListOf<WebView>()
     private val privateTabs = mutableSetOf<WebView>()
     private var active = 0
     private var privateMode = false
     private var dark = false
-    private val prefs by lazy { getSharedPreferences("nova", MODE_PRIVATE) }
+    private var fileCallback: android.webkit.ValueCallback<Array<Uri>>? = null
+    private val prefs by lazy { getSharedPreferences("nova", Context.MODE_PRIVATE) }
     private val engines = listOf("Google", "Bing", "DuckDuckGo", "Brave Search")
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,43 +48,73 @@ class MainActivity : Activity() {
     }
 
     private fun buildUi() {
-        root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE) }
-        val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(8,8,8,8) }
-        engine = Spinner(this).apply {
+        root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val top = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(6, 4, 6, 4)
+        }
+        val engine = Spinner(this).apply {
             adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, engines)
             setSelection(prefs.getInt("engine", 0).coerceIn(0, engines.lastIndex))
-            onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
-                override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) { prefs.edit().putInt("engine", position).apply() }
+                override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                    prefs.edit().putInt("engine", position).apply()
+                }
             }
         }
-        top.addView(engine, LinearLayout.LayoutParams(112, 48))
+        top.addView(engine, LinearLayout.LayoutParams(104, 48))
         address = EditText(this).apply {
-            singleLine = true; hint = "Search or enter address"; textSize = 14f
+            isSingleLine = true
+            hint = "Search or enter address"
+            textSize = 14f
             imeOptions = EditorInfo.IME_ACTION_GO
-            setOnEditorActionListener { _, action, _ -> if (action == EditorInfo.IME_ACTION_GO || action == EditorInfo.IME_ACTION_DONE) { navigate(text.toString()); true } else false }
+            setSelectAllOnFocus(true)
+            setOnEditorActionListener { _, action, _ ->
+                if (action == EditorInfo.IME_ACTION_GO || action == EditorInfo.IME_ACTION_DONE) {
+                    navigate(text.toString(), engine.selectedItemPosition); true
+                } else false
+            }
         }
         top.addView(address, LinearLayout.LayoutParams(0, 48, 1f))
-        top.addView(button("Go") { navigate(address.text.toString()) })
+        top.addView(button("Go") { navigate(address.text.toString(), engine.selectedItemPosition) })
         root.addView(top)
-        val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setPadding(4,2,4,4) }
-        controls.addView(button("←") { current()?.goBack() })
-        controls.addView(button("→") { current()?.goForward() })
+
+        val controls = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        controls.addView(button("←") { if (current()?.canGoBack() == true) current()?.goBack() })
+        controls.addView(button("→") { if (current()?.canGoForward() == true) current()?.goForward() })
         controls.addView(button("↻") { current()?.reload() })
         controls.addView(button("★") { bookmark() })
-        tabsLabel = TextView(this).apply { text = "Tabs 1"; gravity = Gravity.CENTER; setPadding(8,12,8,12); setOnClickListener { showTabs() } }
+        controls.addView(button("Bookmarks") { showSavedList(false) })
+        controls.addView(button("History") { showSavedList(true) })
+        tabsLabel = TextView(this).apply {
+            text = "Tabs 0"
+            gravity = Gravity.CENTER
+            setPadding(7, 12, 7, 12)
+            setOnClickListener { showTabs() }
+        }
         controls.addView(tabsLabel)
         controls.addView(button("Private") { togglePrivate() })
         controls.addView(button("☾") { toggleDark() })
         root.addView(controls)
         setContentView(root)
+        applyTheme()
     }
 
     private fun button(label: String, action: () -> Unit) = Button(this).apply {
-        text = label; isAllCaps = false; textSize = 12f; setPadding(5,0,5,0); setOnClickListener { action() }
+        text = label
+        isAllCaps = false
+        textSize = 11f
+        minWidth = 0
+        setPadding(3, 0, 3, 0)
+        setOnClickListener { action() }
     }
 
-    private fun current() = pages.getOrNull(active)
+    private fun current(): WebView? = pages.getOrNull(active)
 
     private fun newTab(url: String = "about:blank") {
         val web = WebView(this)
@@ -78,92 +123,142 @@ class MainActivity : Activity() {
             domStorageEnabled = true
             loadsImagesAutomatically = true
             setSupportMultipleWindows(false)
+            javaScriptCanOpenWindowsAutomatically = false
             allowFileAccess = false
             allowContentAccess = false
             allowFileAccessFromFileURLs = false
             allowUniversalAccessFromFileURLs = false
+            mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             if (android.os.Build.VERSION.SDK_INT >= 26) safeBrowsingEnabled = true
             if (privateMode) cacheMode = WebSettings.LOAD_NO_CACHE
         }
         if (privateMode) privateTabs.add(web)
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, !privateMode)
+
         web.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val uri = request?.url ?: return false
                 val scheme = uri.scheme?.lowercase(Locale.ROOT) ?: return true
-                if (scheme == "http" || scheme == "https") return false
-                if (scheme == "about" || scheme == "blob" || scheme == "data") return false
+                if (scheme == "http" || scheme == "https" || scheme == "about" || scheme == "blob" || scheme == "data") return false
                 return try {
                     startActivity(Intent(Intent.ACTION_VIEW, uri))
                     true
                 } catch (_: Exception) {
-                    Toast.makeText(this@MainActivity, "No app can open this link", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "No compatible app found for this link", Toast.LENGTH_SHORT).show()
                     true
                 }
             }
+
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
-                if (view === current()) address.setText(url ?: "")
+                if (view === current()) address.setText(url.orEmpty())
             }
+
             override fun onPageFinished(view: WebView?, url: String?) {
-                if (view === current()) address.setText(url ?: "")
-                if (view !in privateTabs && url?.startsWith("https://") == true) saveHistory(url)
+                if (view === current()) address.setText(url.orEmpty())
+                if (view !in privateTabs && !url.isNullOrBlank() &&
+                    (url.startsWith("https://", true) || url.startsWith("http://", true))) {
+                    saveHistory(url)
+                }
             }
+
             override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
                 val host = request?.url?.host?.lowercase(Locale.ROOT)?.removePrefix("www.") ?: return null
                 if (blockedHosts.any { host == it || host.endsWith(".$it") }) {
-                    return WebResourceResponse("text/plain", "utf-8", 204, "Blocked", emptyMap(), java.io.ByteArrayInputStream(ByteArray(0)))
+                    return WebResourceResponse(
+                        "text/plain", "utf-8", 204, "Blocked", emptyMap(),
+                        ByteArrayInputStream(ByteArray(0))
+                    )
                 }
                 return null
             }
+
             override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: android.net.http.SslError?) {
                 handler?.cancel()
             }
         }
-        web.setDownloadListener { url, userAgent, disposition, mime, _ ->
+
+        web.webChromeClient = object : WebChromeClient() {
+            override fun onShowFileChooser(
+                webView: WebView?,
+                callback: android.webkit.ValueCallback<Array<Uri>>?,
+                params: FileChooserParams?
+            ): Boolean {
+                fileCallback?.onReceiveValue(null)
+                fileCallback = callback
+                val intent = params?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "*/*"
+                }
+                return try {
+                    startActivityForResult(intent, FILE_PICKER_REQUEST)
+                    true
+                } catch (_: Exception) {
+                    fileCallback?.onReceiveValue(null)
+                    fileCallback = null
+                    false
+                }
+            }
+        }
+
+        web.setDownloadListener(DownloadListener { url, userAgent, disposition, mime, _ ->
             try {
-                val req = DownloadManager.Request(Uri.parse(url))
-                req.setMimeType(mime)
-                req.addRequestHeader("User-Agent", userAgent ?: "")
-                CookieManager.getInstance().getCookie(url)?.let { req.addRequestHeader("Cookie", it) }
-                req.setTitle(URLUtil.guessFileName(url, disposition, mime))
-                req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                (getSystemService(DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
-                Toast.makeText(this, "Download started", Toast.LENGTH_SHORT).show()
+                val request = DownloadManager.Request(Uri.parse(url))
+                if (!mime.isNullOrBlank()) request.setMimeType(mime)
+                request.addRequestHeader("User-Agent", userAgent.orEmpty())
+                if (viewIsPrivate(web)) {
+                    Toast.makeText(this, "Downloads are disabled in private tabs", Toast.LENGTH_LONG).show()
+                } else {
+                    CookieManager.getInstance().getCookie(url)?.let { request.addRequestHeader("Cookie", it) }
+                    request.setTitle(URLUtil.guessFileName(url, disposition, mime))
+                    request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    (getSystemService(DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
+                    Toast.makeText(this, "Download started", Toast.LENGTH_SHORT).show()
+                }
             } catch (_: Exception) {
                 Toast.makeText(this, "Unable to start download", Toast.LENGTH_SHORT).show()
             }
-        }
-        pages.add(web); active = pages.lastIndex
+        })
+
+        pages.add(web)
+        active = pages.lastIndex
         root.addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
         showOnlyActive()
         updateTabs()
         if (url != "about:blank") web.loadUrl(url)
     }
 
+    private fun viewIsPrivate(web: WebView) = web in privateTabs
+
     private fun showOnlyActive() {
-        root.removeViews(2, root.childCount - 2)
-        pages.forEachIndexed { i, web ->
-            web.visibility = if (i == active) View.VISIBLE else View.GONE
+        if (root.childCount > 2) root.removeViews(2, root.childCount - 2)
+        pages.forEachIndexed { index, web ->
+            web.visibility = if (index == active) View.VISIBLE else View.GONE
             root.addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
         }
+        address.setText(current()?.url.orEmpty())
     }
 
-    private fun navigate(input: String) {
+    private fun navigate(input: String, engineIndex: Int = prefs.getInt("engine", 0)) {
         val value = input.trim()
         if (value.isEmpty()) return
         val uri = runCatching { Uri.parse(value) }.getOrNull()
-        val hasScheme = uri?.scheme?.matches(Regex("(?i)^[a-z][a-z0-9+.-]*$")) == true
-        val looksLikeHost = value.contains(".") && !value.any { it.isWhitespace() } && !value.startsWith(".")
-        val url = when {
-            hasScheme && uri?.scheme in listOf("http", "https") -> value
+        val scheme = uri?.scheme?.lowercase(Locale.ROOT)
+        val hasScheme = scheme != null && scheme.matches(Regex("^[a-z][a-z0-9+.-]*$"))
+        val normalized = if (hasScheme && (scheme == "http" || scheme == "https")) {
+            scheme + value.substringAfter(':')
+        } else value
+        val hostCandidate = value.contains(".") && !value.any { it.isWhitespace() } &&
+            !value.startsWith(".") && !value.startsWith("www..")
+        val target = when {
+            hasScheme && (scheme == "http" || scheme == "https") -> normalized
             hasScheme -> {
-                Toast.makeText(this, "Only web addresses can be entered here", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Only web addresses and searches are supported", Toast.LENGTH_SHORT).show()
                 return
             }
-            looksLikeHost -> "https://$value"
+            hostCandidate -> "https://$value"
             else -> {
                 val q = URLEncoder.encode(value, "UTF-8")
-                when (engine.selectedItemPosition) {
+                when (engineIndex.coerceIn(0, engines.lastIndex)) {
                     1 -> "https://www.bing.com/search?q=$q"
                     2 -> "https://duckduckgo.com/?q=$q"
                     3 -> "https://search.brave.com/search?q=$q"
@@ -171,61 +266,110 @@ class MainActivity : Activity() {
                 }
             }
         }
-        current()?.loadUrl(url)
+        current()?.loadUrl(target)
     }
 
     private fun updateTabs() { tabsLabel.text = "Tabs ${pages.size}" }
 
     private fun showTabs() {
-        val names = pages.mapIndexed { i, w -> "${i + 1}. ${w.title ?: w.url ?: "New tab"}" }.toMutableList()
+        val names = pages.mapIndexed { i, web ->
+            val mode = if (web in privateTabs) " [Private]" else ""
+            "${i + 1}. ${web.title ?: web.url ?: "New tab"}$mode"
+        }.toMutableList()
         names.add("＋ New tab")
-        AlertDialog.Builder(this).setTitle("Nova tabs").setItems(names.toTypedArray()) { _, which ->
-            if (which == pages.size) newTab("https://www.google.com") else {
-                active = which; showOnlyActive(); updateTabs(); address.setText(current()?.url ?: "")
+        AlertDialog.Builder(this)
+            .setTitle("Nova tabs")
+            .setItems(names.toTypedArray()) { _, which ->
+                if (which == pages.size) newTab("https://www.google.com")
+                else { active = which; showOnlyActive(); updateTabs() }
             }
-        }.setNegativeButton("Close current") { _, _ -> closeTab() }.show()
+            .setNegativeButton("Close current") { _, _ -> closeTab() }
+            .show()
     }
 
     private fun closeTab() {
-        if (pages.size <= 1) {
-            current()?.apply { stopLoading(); loadUrl("about:blank") }
+        val removed = current() ?: return
+        if (pages.size == 1) {
+            removed.stopLoading()
+            if (removed in privateTabs) clearPrivateWebView(removed)
+            removed.loadUrl("about:blank")
+            address.setText("")
             return
         }
-        val removed = pages.removeAt(active)
-        privateTabs.remove(removed)
+        pages.removeAt(active)
+        if (removed in privateTabs) {
+            privateTabs.remove(removed)
+            clearPrivateWebView(removed)
+        }
         removed.stopLoading()
         removed.loadUrl("about:blank")
         removed.clearHistory()
         removed.clearCache(true)
         removed.destroy()
-        active = (active - 1).coerceAtLeast(0)
-        showOnlyActive(); updateTabs()
+        active = active.coerceAtMost(pages.lastIndex)
+        showOnlyActive()
+        updateTabs()
+    }
+
+    private fun clearPrivateWebView(web: WebView) {
+        web.clearHistory()
+        web.clearCache(true)
+        web.clearFormData()
+        web.loadUrl("about:blank")
+        // WebView's CookieManager is process-wide; this prototype cannot safely isolate private cookies.
     }
 
     private fun togglePrivate() {
         privateMode = !privateMode
-        Toast.makeText(this,
-            if (privateMode) "Private tab opened. WebView cookies are shared with regular tabs; this is not fully private." else "Private mode off",
-            Toast.LENGTH_LONG).show()
+        Toast.makeText(
+            this,
+            if (privateMode) "Limited private tab: history is not saved, but cookies are not isolated." else "Private mode off",
+            Toast.LENGTH_LONG
+        ).show()
         newTab("about:blank")
     }
 
     private fun toggleDark() {
         dark = !dark
-        root.setBackgroundColor(if (dark) Color.rgb(30,30,30) else Color.WHITE)
+        applyTheme()
+    }
+
+    private fun applyTheme() {
+        val background = if (dark) Color.rgb(30, 30, 30) else Color.WHITE
+        root.setBackgroundColor(background)
         address.setTextColor(if (dark) Color.WHITE else Color.BLACK)
         address.setHintTextColor(if (dark) Color.LTGRAY else Color.GRAY)
     }
 
     private fun bookmark() {
         val url = current()?.url ?: return
-        if (!url.startsWith("https://") && !url.startsWith("http://")) return
+        if (!url.startsWith("https://", true) && !url.startsWith("http://", true)) return
         val list = JSONArray(prefs.getString("bookmarks", "[]"))
         if ((0 until list.length()).any { list.optString(it) == url }) {
-            Toast.makeText(this, "Already bookmarked", Toast.LENGTH_SHORT).show(); return
+            Toast.makeText(this, "Already bookmarked", Toast.LENGTH_SHORT).show()
+            return
         }
-        list.put(url); prefs.edit().putString("bookmarks", list.toString()).apply()
+        list.put(url)
+        prefs.edit().putString("bookmarks", list.toString()).apply()
         Toast.makeText(this, "Bookmark saved", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showSavedList(history: Boolean) {
+        val key = if (history) "history" else "bookmarks"
+        val list = JSONArray(prefs.getString(key, "[]"))
+        val entries = (0 until list.length()).map { list.optString(it) }.reversed()
+        if (entries.isEmpty()) {
+            Toast.makeText(this, if (history) "No history yet" else "No bookmarks yet", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, entries)
+        val dialog = AlertDialog.Builder(this).setTitle(if (history) "History" else "Bookmarks")
+            .setAdapter(adapter) { _, position -> current()?.loadUrl(entries[position]) }
+            .setNeutralButton("Clear all") { _, _ ->
+                prefs.edit().remove(key).apply()
+                Toast.makeText(this, if (history) "History cleared" else "Bookmarks cleared", Toast.LENGTH_SHORT).show()
+            }.setNegativeButton("Close", null).create()
+        dialog.show()
     }
 
     private fun saveHistory(url: String) {
@@ -239,18 +383,38 @@ class MainActivity : Activity() {
         prefs.edit().putString("history", updated.toString()).apply()
     }
 
-    @Suppress("DEPRECATION")
+    @Deprecated("Deprecated in Android")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == FILE_PICKER_REQUEST) {
+            val result = if (resultCode == RESULT_OK && data != null) {
+                val clip = data.clipData
+                if (clip != null) Array(clip.itemCount) { index -> clip.getItemAt(index).uri }
+                else data.data?.let { arrayOf(it) }
+            } else null
+            fileCallback?.onReceiveValue(result)
+            fileCallback = null
+        }
+    }
+
+    @Deprecated("Deprecated in Android")
     override fun onBackPressed() {
-        if (current()?.canGoBack() == true) current()?.goBack() else super.onBackPressed()
+        if (current()?.canGoBack() == true) current()?.goBack()
+        else if (pages.size > 1) closeTab()
+        else super.onBackPressed()
     }
 
     override fun onDestroy() {
+        fileCallback?.onReceiveValue(null)
+        fileCallback = null
         pages.forEach { it.stopLoading(); it.destroy() }
-        pages.clear(); privateTabs.clear()
+        pages.clear()
+        privateTabs.clear()
         super.onDestroy()
     }
 
     companion object {
+        private const val FILE_PICKER_REQUEST = 4102
         private val blockedHosts = setOf(
             "doubleclick.net", "googlesyndication.com", "adservice.google.com",
             "adnxs.com", "ads.yahoo.com", "scorecardresearch.com",
