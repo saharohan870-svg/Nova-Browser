@@ -9,6 +9,8 @@ import android.view.MotionEvent
 import android.view.View
 import java.net.URL
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.max
 
 /**
@@ -19,6 +21,9 @@ import kotlin.math.max
  */
 class ZorviEngineView(context: Context) : View(context) {
     private val worker = Executors.newSingleThreadExecutor()
+    private val navigationGeneration = AtomicInteger(0)
+    private val activeRequest = AtomicReference<ZorviHttpCall?>(null)
+    private var lastTouchY = 0f
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var blocks: List<HtmlNode> = emptyList()
     private var links: List<Pair<FloatArray, String>> = emptyList()
@@ -49,15 +54,26 @@ class ZorviEngineView(context: Context) : View(context) {
             onLoadError?.invoke("Only HTTP and HTTPS are supported in Zorvi")
             return
         }
+        val generation = navigationGeneration.incrementAndGet()
+        activeRequest.getAndSet(null)?.cancel()
+        post {
+            blocks = emptyList()
+            links = emptyList()
+            scrollYpx = 0f
+            invalidate()
+        }
         worker.execute {
+            val call = ZorviHttpCall(
+                ZorviHttpRequest(
+                    target,
+                    headers = mapOf("Accept" to "text/html,application/xhtml+xml"),
+                    maxResponseBytes = ZorviHttpRequest.DEFAULT_MAX_RESPONSE_BYTES
+                )
+            )
+            activeRequest.set(call)
             try {
-                val response = ZorviHttpCall(
-                    ZorviHttpRequest(
-                        target,
-                        headers = mapOf("Accept" to "text/html,application/xhtml+xml"),
-                        maxResponseBytes = ZorviHttpRequest.DEFAULT_MAX_RESPONSE_BYTES
-                    )
-                ).execute()
+                val response = call.execute()
+                if (generation != navigationGeneration.get()) return@execute
                 require(response.statusCode in 200..299) { "HTTP ${response.statusCode}" }
                 val type = response.header("Content-Type").orEmpty()
                 require(type.contains("text/html", true) || type.contains("application/xhtml+xml", true)) {
@@ -95,7 +111,13 @@ class ZorviEngineView(context: Context) : View(context) {
                     invalidate()
                 }
             } catch (error: Exception) {
-                post { onLoadError?.invoke(error.message ?: "Page load failed") }
+                if (generation == navigationGeneration.get()) {
+                    post {
+                        if (generation == navigationGeneration.get()) onLoadError?.invoke(error.message ?: "Page load failed")
+                    }
+                }
+            } finally {
+                activeRequest.compareAndSet(call, null)
             }
         }
     }
@@ -162,7 +184,7 @@ class ZorviEngineView(context: Context) : View(context) {
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> return true
+            MotionEvent.ACTION_DOWN -> { lastTouchY = event.y; return true }
             MotionEvent.ACTION_UP -> {
                 val y = event.y + scrollYpx
                 val hit = links.firstOrNull { y >= it.first[1] && y <= it.first[3] && event.x >= it.first[0] && event.x <= it.first[2] }
@@ -178,7 +200,10 @@ class ZorviEngineView(context: Context) : View(context) {
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                // Basic touch scrolling; kinetic scrolling is a later milestone.
+                val delta = lastTouchY - event.y
+                lastTouchY = event.y
+                scrollYpx = (scrollYpx + delta).coerceIn(0f, max(0f, documentHeight - height))
+                invalidate()
                 return true
             }
         }
