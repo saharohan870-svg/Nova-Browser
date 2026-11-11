@@ -66,16 +66,14 @@ class ZorviEngineView(context: Context) : View(context) {
                     }
                     val html = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
                     val document = HtmlDocument.parse(html)
-                    val css = Regex("(?is)<style[^>]*>(.*?)</style>").findAll(html).joinToString("\\n") { it.groupValues[1] }
-                    val scripts = Regex("(?is)<script\\b([^>]*)>(.*?)</script\\s*>")
-                        .findAll(html)
-                        .filterNot { Regex("(?i)\\bsrc\\s*=").containsMatchIn(it.groupValues[1]) }
+                    val css = document.findAll("style").joinToString("\\n") { document.textContent(it) }
+                    val scripts = document.findAll("script")
+                        .filter { it.attributes["src"].isNullOrBlank() }
                         .take(32)
-                        .map { it.groupValues[2].take(64 * 1024) }
+                        .map { document.textContent(it).take(64 * 1024) }
                         .filter { it.isNotBlank() }
-                        .toList()
                     val baseUrl = connection.url
-                    val title = Regex("(?is)<title[^>]*>(.*?)</title>").find(html)?.groupValues?.get(1)?.trim().orEmpty()
+                    val title = document.findFirst("title")?.let(document::textContent)?.trim().orEmpty()
                     post {
                         domDocument = ZorviDomDocument.from(document)
                         domDocument?.onMutation = {
