@@ -35,9 +35,12 @@ internal data class HtmlDocument(val root: HtmlNode) {
         fun parse(source: String): HtmlDocument {
             val input = source.take(MAX_SOURCE_CHARS)
             val document = HtmlNode("document")
-            val html = HtmlNode("html", attributes = mutableMapOf())
-            val head = HtmlNode("head", attributes = mutableMapOf())
-            val body = HtmlNode("body", attributes = mutableMapOf())
+            val htmlAttributes = mutableMapOf<String, String>()
+            val headAttributes = mutableMapOf<String, String>()
+            val bodyAttributes = mutableMapOf<String, String>()
+            val html = HtmlNode("html", attributes = htmlAttributes)
+            val head = HtmlNode("head", attributes = headAttributes)
+            val body = HtmlNode("body", attributes = bodyAttributes)
             document.children += html
             html.children += head
             html.children += body
@@ -162,10 +165,10 @@ internal data class HtmlDocument(val root: HtmlNode) {
                 if (name == "html" || name == "head" || name == "body") {
                     val attributes = parseAttributes(trimmed, name.length)
                     when (name) {
-                        "html" -> (html.attributes as MutableMap).putAll(attributes)
-                        "head" -> (head.attributes as MutableMap).putAll(attributes)
+                        "html" -> htmlAttributes.putAll(attributes)
+                        "head" -> headAttributes.putAll(attributes)
                         "body" -> {
-                            (body.attributes as MutableMap).putAll(attributes)
+                            bodyAttributes.putAll(attributes)
                             switchToBody()
                         }
                     }
