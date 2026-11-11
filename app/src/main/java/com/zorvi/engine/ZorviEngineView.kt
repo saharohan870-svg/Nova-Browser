@@ -39,7 +39,11 @@ class ZorviEngineView(context: Context) : View(context) {
         isFocusable = true
     }
 
-    fun addEventListener(type: String, handler: (ZorviEngineEvent) -> Unit) = engineEvents.addEventListener(type, handler)\n\n    fun removeEventListener(type: String, handler: (ZorviEngineEvent) -> Unit) = engineEvents.removeEventListener(type, handler)\n\n    fun loadUrl(address: String) {
+    fun addEventListener(type: String, handler: (ZorviEngineEvent) -> Unit) = engineEvents.addEventListener(type, handler)
+
+    fun removeEventListener(type: String, handler: (ZorviEngineEvent) -> Unit) = engineEvents.removeEventListener(type, handler)
+
+    fun loadUrl(address: String) {
         val target = runCatching { URL(address) }.getOrNull()
         if (target == null || target.protocol !in setOf("http", "https")) {
             onLoadError?.invoke("Only HTTP and HTTPS are supported in this engine prototype")
@@ -152,7 +156,10 @@ class ZorviEngineView(context: Context) : View(context) {
                 if (hit != null) {
                     val destination = runCatching { URL(pageUrl, hit.second).toString() }.getOrNull()
                     if (destination != null && (destination.startsWith("https://") || destination.startsWith("http://"))) {
-                        val event = ZorviEngineEvent("click", payload = destination)\n                        engineEvents.dispatch(event)\n                        onDomEvent?.invoke(event)\n                        onNavigate?.invoke(destination)
+                        val event = ZorviEngineEvent("click", payload = destination)
+                        engineEvents.dispatch(event)
+                        onDomEvent?.invoke(event)
+                        onNavigate?.invoke(destination)
                     }
                 }
                 return true
