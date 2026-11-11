@@ -6,7 +6,7 @@ package com.zorvi.engine
  * This is an internal prototype API, not a complete WHATWG DOM implementation.
  * The document exposes a deliberately small synchronized bridge to the JavaScript runtime; standards-compliant DOM behavior is later work.
  */
-class ZorviDomNode internal constructor(
+internal class ZorviDomNode internal constructor(
     val tagName: String,
     var textContent: String = "",
     val attributes: MutableMap<String, String> = mutableMapOf(),
@@ -54,7 +54,7 @@ class ZorviDomNode internal constructor(
         descendants().filter { it.tagName.equals(tag, ignoreCase = true) }.toList()
 }
 
-class ZorviDomDocument internal constructor(val documentElement: ZorviDomNode) {
+internal class ZorviDomDocument internal constructor(val documentElement: ZorviDomNode) {
     private val listeners = mutableMapOf<String, MutableList<(ZorviDomEvent) -> Unit>>()
     @Volatile var onMutation: (() -> Unit)? = null
 
