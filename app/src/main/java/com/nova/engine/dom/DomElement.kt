@@ -11,7 +11,7 @@ class DomElement(
     private val attributeStore = linkedMapOf<String, String>().apply {
         attributes.forEach { (key, value) -> put(key.lowercase(), value) }
     }
-    private val directText = StringBuilder()
+    private val contentOrder = mutableListOf<Any>()
     private val childElements = mutableListOf<DomElement>()
     private var parentElement: DomElement? = null
 
@@ -26,19 +26,33 @@ class DomElement(
 
     override val textContent: String
         get() = buildString {
-            append(directText)
-            childElements.forEach { append(it.textContent) }
+            contentOrder.forEach { item ->
+                when (item) {
+                    is String -> append(item)
+                    is DomElement -> append(item.textContent)
+                }
+            }
         }
 
     fun attribute(name: String): String? = attributeStore[name.lowercase()]
     fun hasAttribute(name: String): Boolean = attributeStore.containsKey(name.lowercase())
     fun setAttribute(name: String, value: String) { attributeStore[name.lowercase()] = value }
-    fun appendText(text: String) { directText.append(text) }
+
+    fun appendText(text: String) {
+        if (text.isNotEmpty()) contentOrder += text
+    }
 
     fun appendChild(child: DomElement) {
-        child.parentElement?.childElements?.remove(child)
+        child.parentElement?.removeChild(child)
         child.parentElement = this
         childElements += child
+        contentOrder += child
+    }
+
+    private fun removeChild(child: DomElement) {
+        childElements.remove(child)
+        contentOrder.remove(child)
+        child.parentElement = null
     }
 
     fun descendants(includeSelf: Boolean = false): Sequence<DomElement> = sequence {
