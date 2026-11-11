@@ -98,6 +98,7 @@ class MainActivity : Activity() {
             setOnClickListener { showTabs() }
         }
         controls.addView(tabsLabel)
+        controls.addView(button("Zorvi Engine") { openInZorvi() })
         controls.addView(button("Private") { togglePrivate() })
         controls.addView(button("☾") { toggleDark() })
         root.addView(controls)
@@ -267,6 +268,17 @@ class MainActivity : Activity() {
             }
         }
         current()?.loadUrl(target)
+    }
+
+    private fun openInZorvi() {
+        val target = current()?.url?.takeIf {
+            it.startsWith("https://", true) || it.startsWith("http://", true)
+        } ?: address.text.toString().trim().takeIf { it.isNotEmpty() }
+        if (target.isNullOrBlank()) {
+            Toast.makeText(this, "Enter a web address first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        startActivity(Intent(this, ZorviPageActivity::class.java).putExtra(ZorviPageActivity.EXTRA_URL, target))
     }
 
     private fun updateTabs() { tabsLabel.text = "Tabs ${pages.size}" }
