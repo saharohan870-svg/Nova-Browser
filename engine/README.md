@@ -30,3 +30,8 @@ The code is intentionally dependency-free for this first milestone. Later milest
 6. **M6 – compatibility:** Web Platform Tests, HTML/CSS/JS conformance, media and accessibility.
 
 No Chromium-compatibility or performance claim is made. Each milestone needs tests and device validation before it is considered complete.
+
+
+## JavaScript milestone
+
+Zorvi now embeds QuickJS through `io.github.dokar3:quickjs-kt-android`. The prototype executes bounded inline scripts in a dedicated runtime and exposes a deliberately small `document.getElementById()` bridge with `textContent`, `getAttribute()`, and `setAttribute()`. It does not yet implement external script fetching, timers, fetch/XHR, layout/style APIs, event propagation, or the full Web platform. Per-evaluation memory, stack, and execution-time limits are configured; this is an early sandbox boundary, not a security certification.
