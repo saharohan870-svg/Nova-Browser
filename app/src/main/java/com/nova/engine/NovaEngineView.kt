@@ -1,4 +1,4 @@
-package com.nova.engine
+package com.zorvi.engine
 
 import android.content.Context
 import android.graphics.Canvas
@@ -13,23 +13,23 @@ import java.util.concurrent.Executors
 import kotlin.math.max
 
 /**
- * First vertical slice of Nova's own renderer.
+ * First vertical slice of Zorvi's own renderer.
  *
  * Network I/O is off the UI thread. The view draws parsed text with Android
  * Canvas. This is a prototype, not a standards-compliant web browser.
  */
-class NovaEngineView(context: Context) : View(context) {
+class ZorviEngineView(context: Context) : View(context) {
     private val worker = Executors.newSingleThreadExecutor()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var blocks: List<HtmlNode> = emptyList()
     private var links: List<Pair<FloatArray, String>> = emptyList()
     private var scrollYpx = 0f
     private var documentHeight = 0f
-    private var styleSheet = NovaCssStyleSheet("")
+    private var styleSheet = ZorviCssStyleSheet("")
     private var pageUrl: URL? = null
-    private var domDocument: NovaDomDocument? = null
-    private val engineEvents = NovaEventTarget()
-    var onDomEvent: ((NovaEngineEvent) -> Unit)? = null
+    private var domDocument: ZorviDomDocument? = null
+    private val engineEvents = ZorviEventTarget()
+    var onDomEvent: ((ZorviEngineEvent) -> Unit)? = null
     var onNavigate: ((String) -> Unit)? = null
     var onPageTitle: ((String) -> Unit)? = null
     var onLoadError: ((String) -> Unit)? = null
@@ -39,7 +39,7 @@ class NovaEngineView(context: Context) : View(context) {
         isFocusable = true
     }
 
-    fun addEventListener(type: String, handler: (NovaEngineEvent) -> Unit) = engineEvents.addEventListener(type, handler)\n\n    fun removeEventListener(type: String, handler: (NovaEngineEvent) -> Unit) = engineEvents.removeEventListener(type, handler)\n\n    fun loadUrl(address: String) {
+    fun addEventListener(type: String, handler: (ZorviEngineEvent) -> Unit) = engineEvents.addEventListener(type, handler)\n\n    fun removeEventListener(type: String, handler: (ZorviEngineEvent) -> Unit) = engineEvents.removeEventListener(type, handler)\n\n    fun loadUrl(address: String) {
         val target = runCatching { URL(address) }.getOrNull()
         if (target == null || target.protocol !in setOf("http", "https")) {
             onLoadError?.invoke("Only HTTP and HTTPS are supported in this engine prototype")
@@ -51,7 +51,7 @@ class NovaEngineView(context: Context) : View(context) {
                     connectTimeout = 12_000
                     readTimeout = 15_000
                     instanceFollowRedirects = true
-                    setRequestProperty("User-Agent", "NovaEngine/0.1 (Android)")
+                    setRequestProperty("User-Agent", "ZorviEngine/0.1 (Android)")
                     setRequestProperty("Accept", "text/html,application/xhtml+xml")
                 }
                 try {
@@ -61,12 +61,13 @@ class NovaEngineView(context: Context) : View(context) {
                     }
                     val html = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
                     val document = HtmlDocument.parse(html)
-                    val css = Regex("(?is)<style[^>]*>(.*?)</style>").findAll(html).joinToString("\\n") { it.groupValues[1] }
+                    val css = Regex("(?is)<style[^>]*>(.*?)</style>").findAll(html).joinToString("
+") { it.groupValues[1] }
                     val baseUrl = connection.url
                     val title = Regex("(?is)<title[^>]*>(.*?)</title>").find(html)?.groupValues?.get(1)?.trim().orEmpty()
                     post {
                         blocks = document.visibleBlocks()
-                        styleSheet = NovaCssStyleSheet(css)
+                        styleSheet = ZorviCssStyleSheet(css)
                         pageUrl = baseUrl
                         onPageTitle?.invoke(title)
                         scrollYpx = 0f
@@ -151,7 +152,7 @@ class NovaEngineView(context: Context) : View(context) {
                 if (hit != null) {
                     val destination = runCatching { URL(pageUrl, hit.second).toString() }.getOrNull()
                     if (destination != null && (destination.startsWith("https://") || destination.startsWith("http://"))) {
-                        val event = NovaEngineEvent("click", payload = destination)\n                        engineEvents.dispatch(event)\n                        onDomEvent?.invoke(event)\n                        onNavigate?.invoke(destination)
+                        val event = ZorviEngineEvent("click", payload = destination)\n                        engineEvents.dispatch(event)\n                        onDomEvent?.invoke(event)\n                        onNavigate?.invoke(destination)
                     }
                 }
                 return true
