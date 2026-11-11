@@ -168,6 +168,8 @@ internal class ZorviDomDocument internal constructor(val documentElement: ZorviD
     @Synchronized fun innerHtml(node: ZorviDomNode): String =
         node.children.joinToString("") { serializeNode(it) }
 
+    @Synchronized fun outerHtml(node: ZorviDomNode): String = serializeNode(node)
+
     private fun serializeNode(node: ZorviDomNode): String {
         if (node.tagName == "#text") return escapeText(node.textContent)
         val tag = node.tagName.lowercase()
