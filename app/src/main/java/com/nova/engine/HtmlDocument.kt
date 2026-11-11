@@ -35,7 +35,7 @@ internal data class HtmlDocument(val root: HtmlNode) {
                     }
                     part.startsWith("<") -> {
                         val inside = part.drop(1).dropLast(1).trim()
-                        val name = inside.substringBefore(Regex("\\s")).trimEnd('/').lowercase()
+                        val name = inside.split(Regex("\\s"), limit = 2).first().trimEnd('/').lowercase()
                         if (name.isEmpty() || name.startsWith("?")) return@forEach
                         val attrs = attr.findAll(inside.drop(name.length)).associate {
                             it.groupValues[1].lowercase() to (it.groups[2]?.value ?: it.groups[3]?.value ?: it.groups[4]?.value.orEmpty())
