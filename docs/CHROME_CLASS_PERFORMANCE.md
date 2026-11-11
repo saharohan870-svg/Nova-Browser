@@ -1,8 +1,8 @@
-# Nova Browser — Chrome-Class Performance Plan
+# Zorvi Browser — Chrome-Class Performance Plan
 
 ## Goal
 
-Nova should feel as fast as Chrome on the same Android device wherever practical: cold start, warm start, navigation, page rendering, scrolling, JavaScript execution, media playback and tab switching. Chrome parity is a performance target, not a result that can be claimed before device testing.
+Zorvi should feel as fast as Chrome on the same Android device wherever practical: cold start, warm start, navigation, page rendering, scrolling, JavaScript execution, media playback and tab switching. Chrome parity is a performance target, not a result that can be claimed before device testing.
 
 ## Device constraints
 
@@ -46,4 +46,4 @@ Use Chrome on the same phone as the reference. A page-load result is only compar
 
 ## Current status
 
-This is an engineering target only. No standalone Nova Chromium build has yet been benchmarked against Chrome on the target phone. The existing WebView prototype cannot substantiate Chrome-engine speed parity.
+This is an engineering target only. No standalone Zorvi Chromium build has yet been benchmarked against Chrome on the target phone. The existing WebView prototype cannot substantiate Chrome-engine speed parity.
