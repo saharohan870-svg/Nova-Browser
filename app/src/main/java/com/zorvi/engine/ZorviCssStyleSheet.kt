@@ -2,7 +2,7 @@ package com.zorvi.engine
 
 import android.graphics.Color
 
-/** Small, intentionally incomplete CSS cascade for Zorvi Engine's next prototype milestone. */
+/** Small, intentionally incomplete CSS cascade for Zorvi Engine's prototype. */
 internal data class ZorviCssStyle(
     var display: String = "block",
     var color: Int = Color.rgb(30, 30, 30),
@@ -17,15 +17,8 @@ internal data class ZorviCssStyle(
 
 internal class ZorviCssStyleSheet(cssText: String) {
     private data class Rule(val selector: String, val declarations: Map<String, String>, val specificity: Int, val order: Int)
-    private val rules: List<Rule>
-
-    init {
-        rules = Regex("(?s)([^{}]+)\\{([^{}]*)\\}").findAll(cssText.take(512_000)).mapIndexedNotNull { index, match ->
-            val selector = match.groupValues[1].trim()
-            if (selector.isEmpty() || selector.startsWith("@")) return@mapIndexedNotNull null
-            val declarations = parseDeclarations(match.groupValues[2])
-            Rule(selector, declarations, specificity(selector), index)
-        }.toList()
+    private val rules = ZorviCssParser(cssText).parseStyleRules().map { parsed ->
+        Rule(parsed.selector, parsed.declarations.associate { it.property to it.value }, specificity(parsed.selector), parsed.sourceOrder)
     }
 
     fun styleFor(node: HtmlNode): ZorviCssStyle {
@@ -39,9 +32,12 @@ internal class ZorviCssStyleSheet(cssText: String) {
             "li" -> { style.marginTop = 3f; style.marginBottom = 3f }
             "title" -> style.display = "none"
         }
-        val applicable = rules.filter { matches(it.selector, node) }.sortedWith(compareBy<Rule> { it.specificity }.thenBy { it.order })
-        applicable.forEach { apply(style, it.declarations) }
-        apply(style, parseDeclarations(node.attributes["style"].orEmpty()))
+        rules.filter { matches(it.selector, node) }
+            .sortedWith(compareBy<Rule> { it.specificity }.thenBy { it.order })
+            .forEach { apply(style, it.declarations) }
+        val inline = ZorviCssParser("x { ${node.attributes["style"].orEmpty()} }").parseStyleRules()
+            .firstOrNull()?.declarations?.associate { it.property to it.value }.orEmpty()
+        apply(style, inline)
         return style
     }
 
@@ -70,8 +66,7 @@ internal class ZorviCssStyleSheet(cssText: String) {
                 val tag = Regex("^[a-zA-Z][a-zA-Z0-9-]*").find(simple)?.value?.lowercase()
                 val id = Regex("#([\\w-]+)").find(simple)?.groupValues?.get(1)
                 val classes = Regex("\\.([\\w-]+)").findAll(simple).map { it.groupValues[1] }.toList()
-                (tag == null || tag == node.tag) &&
-                    (id == null || id == node.attributes["id"]) &&
+                (tag == null || tag == node.tag) && (id == null || id == node.attributes["id"]) &&
                     classes.all { it in node.attributes["class"].orEmpty().split(Regex("\\s+")) }
             }
         }
@@ -87,7 +82,6 @@ internal class ZorviCssStyleSheet(cssText: String) {
             value.endsWith("px") || value.matches(Regex("^-?\\d+(?:\\.\\d+)?$")) -> number
             value.endsWith("pt") -> number * 1.333f
             value.endsWith("em") || value.endsWith("rem") -> number * 17f
-            value.endsWith("%") -> null
             else -> null
         }
     }
@@ -102,25 +96,10 @@ internal class ZorviCssStyleSheet(cssText: String) {
         "gray", "grey" -> Color.GRAY
         else -> try {
             when {
-                value.matches(Regex("#[0-9a-f]{3}")) -> {
-                    val r = value[1].digitToInt(16) * 17
-                    val g = value[2].digitToInt(16) * 17
-                    val b = value[3].digitToInt(16) * 17
-                    Color.rgb(r, g, b)
-                }
-                value.matches(Regex("#[0-9a-f]{6}")) -> Color.parseColor(value)
-                value.matches(Regex("#[0-9a-f]{8}")) -> Color.parseColor(value)
+                value.matches(Regex("#[0-9a-f]{3}")) -> Color.rgb(value[1].digitToInt(16) * 17, value[2].digitToInt(16) * 17, value[3].digitToInt(16) * 17)
+                value.matches(Regex("#[0-9a-f]{6}")) || value.matches(Regex("#[0-9a-f]{8}")) -> Color.parseColor(value)
                 else -> null
             }
         } catch (_: IllegalArgumentException) { null }
-    }
-
-    companion object {
-        private fun parseDeclarations(input: String): Map<String, String> =
-            input.split(';').mapNotNull { declaration ->
-                val separator = declaration.indexOf(':')
-                if (separator <= 0) null
-                else declaration.substring(0, separator).trim().lowercase() to declaration.substring(separator + 1).trim()
-            }.toMap()
     }
 }
