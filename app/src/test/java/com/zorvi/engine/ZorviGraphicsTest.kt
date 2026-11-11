@@ -16,7 +16,7 @@ class ZorviGraphicsTest {
     }
 
     @Test fun paintDisplayListCommandsKeepRequestedGeometry() {
-        val rect = android.graphics.RectF(1f, 2f, 30f, 40f)
+        val rect = ZorviRect(1f, 2f, 30f, 40f)
         val command = ZorviPaintCommand.FillRect(rect, 0xff123456.toInt())
         assertEquals(1f, command.bounds.left)
         assertEquals(40f, command.bounds.bottom)
