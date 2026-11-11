@@ -1,28 +1,28 @@
-package com.nova.engine
+package com.zorvi.engine
 
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * Minimal user-action event dispatcher for the Nova Engine prototype.
+ * Minimal user-action event dispatcher for the Zorvi Engine prototype.
  * This is not standards-complete DOM event propagation.
  */
-internal class NovaEventTarget {
-    private val handlers = mutableMapOf<String, CopyOnWriteArrayList<(NovaEngineEvent) -> Unit>>()
+internal class ZorviEventTarget {
+    private val handlers = mutableMapOf<String, CopyOnWriteArrayList<(ZorviEngineEvent) -> Unit>>()
 
-    fun addEventListener(type: String, handler: (NovaEngineEvent) -> Unit) {
+    fun addEventListener(type: String, handler: (ZorviEngineEvent) -> Unit) {
         handlers.getOrPut(type.lowercase()) { CopyOnWriteArrayList() }.add(handler)
     }
 
-    fun removeEventListener(type: String, handler: (NovaEngineEvent) -> Unit) {
+    fun removeEventListener(type: String, handler: (ZorviEngineEvent) -> Unit) {
         handlers[type.lowercase()]?.remove(handler)
     }
 
-    fun dispatch(event: NovaEngineEvent) {
+    fun dispatch(event: ZorviEngineEvent) {
         handlers[event.type.lowercase()]?.forEach { it(event) }
     }
 }
 
-internal data class NovaEngineEvent(
+internal data class ZorviEngineEvent(
     val type: String,
     val targetId: String? = null,
     val payload: String? = null
