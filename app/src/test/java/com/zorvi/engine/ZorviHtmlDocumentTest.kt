@@ -73,4 +73,27 @@ class ZorviHtmlDocumentTest {
         assertTrue(document.visibleBlocks().any { it.text == "Real text" })
     }
 
+    @Test fun scriptRawTextDoesNotDecodeEntitiesOrCloseOnLongerTagNames() {
+        val document = HtmlDocument.parse("<script>const x = '&amp;';</scripture>still script text</script><p>After</p>")
+        assertEquals("const x = '&amp;';</scripture>still script text", document.findFirst("script")!!.children.single().text)
+        assertTrue(document.visibleBlocks().any { it.text == "After" })
+    }
+
+    @Test fun rcdataTitleDecodesEntities() {
+        val document = HtmlDocument.parse("<title>Tom &amp; Jerry</title><p>Body</p>")
+        assertEquals("Tom & Jerry", document.textContent(document.findFirst("title")!!))
+    }
+
+    @Test fun malformedInputsDoNotCrashParser() {
+        val samples = listOf(
+            "<", "<<<<", "<a href='unterminated", "<div><span><p>x</div>",
+            "<!-- never closed", "<script>unterminated <b>text", "<p a==b c=d>value",
+            "<!DOCTYPE html><html><body><p>ok"
+        )
+        samples.forEach { source ->
+            val parsed = HtmlDocument.parse(source)
+            assertNotNull(parsed.root)
+        }
+    }
+
 }
