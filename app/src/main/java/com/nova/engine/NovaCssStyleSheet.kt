@@ -1,9 +1,9 @@
-package com.nova.engine
+package com.zorvi.engine
 
 import android.graphics.Color
 
-/** Small, intentionally incomplete CSS cascade for Nova Engine's next prototype milestone. */
-internal data class NovaCssStyle(
+/** Small, intentionally incomplete CSS cascade for Zorvi Engine's next prototype milestone. */
+internal data class ZorviCssStyle(
     var display: String = "block",
     var color: Int = Color.rgb(30, 30, 30),
     var backgroundColor: Int = Color.TRANSPARENT,
@@ -15,7 +15,7 @@ internal data class NovaCssStyle(
     var padding: Float = 0f
 )
 
-internal class NovaCssStyleSheet(cssText: String) {
+internal class ZorviCssStyleSheet(cssText: String) {
     private data class Rule(val selector: String, val declarations: Map<String, String>, val specificity: Int, val order: Int)
     private val rules: List<Rule>
 
@@ -28,8 +28,8 @@ internal class NovaCssStyleSheet(cssText: String) {
         }.toList()
     }
 
-    fun styleFor(node: HtmlNode): NovaCssStyle {
-        val style = NovaCssStyle()
+    fun styleFor(node: HtmlNode): ZorviCssStyle {
+        val style = ZorviCssStyle()
         when (node.tag) {
             "h1" -> { style.fontSizeSp = 28f; style.bold = true; style.marginTop = 18f; style.marginBottom = 12f }
             "h2" -> { style.fontSizeSp = 23f; style.bold = true; style.marginTop = 16f }
@@ -45,7 +45,7 @@ internal class NovaCssStyleSheet(cssText: String) {
         return style
     }
 
-    private fun apply(style: NovaCssStyle, declarations: Map<String, String>) {
+    private fun apply(style: ZorviCssStyle, declarations: Map<String, String>) {
         declarations.forEach { (property, raw) ->
             val value = raw.trim().lowercase()
             when (property) {
