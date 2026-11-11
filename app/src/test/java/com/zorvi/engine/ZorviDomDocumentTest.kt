@@ -85,6 +85,21 @@ class ZorviDomDocumentTest {
         assertEquals(6, document.querySelectorAll("*").size)
     }
 
+    @Test fun serializesTextAttributesAndVoidElementsSafely() {
+        val document = ZorviDomDocument.from(
+            HtmlDocument.parse("<p id='x' title='A &quot; B'>A &amp; B<strong>Bold</strong></p><br>")
+        )
+        val paragraph = document.getElementById("x")!!
+        val body = document.getElementById("main") ?: document.getElementByTagForTest("body")
+
+        assertEquals(
+            "<p id=\"x\" title=\"A &quot; B\">A &amp; B<strong>Bold</strong></p>",
+            document.outerHtml(paragraph)
+        )
+        assertTrue(document.innerHtml(body).endsWith("<br>"))
+        assertFalse(document.innerHtml(body).contains("</br>"))
+    }
+
     @Test fun dispatchesTypedDocumentEvents() {
         val document = ZorviDomDocument.from(HtmlDocument.parse("<p id='x'>text</p>"))
         val target = document.getElementById("x")!!
@@ -152,6 +167,9 @@ class ZorviDomDocumentTest {
     }
 
 }
+
+private fun ZorviDomDocument.getElementByTagForTest(tag: String): ZorviDomNode =
+    getElementsByTagName(tag).first()
 
 private fun ZorviDomNode.addListenerForTest(
     type: String,
