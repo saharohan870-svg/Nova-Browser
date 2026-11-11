@@ -32,6 +32,7 @@ class ZorviEngineView(context: Context) : View(context) {
     private var styleSheet = ZorviCssStyleSheet("")
     private var pageUrl: URL? = null
     private var domDocument: ZorviDomDocument? = null
+    private var accessibilityTree = ZorviAccessibilityTree(emptyList())
     private val scriptRuntime = ZorviScriptRuntime()
     private val engineEvents = ZorviEventTarget()
     var onDomEvent: ((ZorviEngineEvent) -> Unit)? = null
@@ -80,7 +81,7 @@ class ZorviEngineView(context: Context) : View(context) {
                     "Zorvi currently displays HTML documents only"
                 }
                 val charset = Regex("charset=([^; ]+)", RegexOption.IGNORE_CASE)
-                    .find(type)?.groupValues?.get(1)?.trim('"', '\\'')
+                    .find(type)?.groupValues?.get(1)?.trim('"', '\'')
                 val encoding = runCatching { java.nio.charset.Charset.forName(charset ?: "UTF-8") }
                     .getOrDefault(Charsets.UTF_8)
                 val html = response.body.toString(encoding)
@@ -98,10 +99,13 @@ class ZorviEngineView(context: Context) : View(context) {
                     domDocument?.onMutation = {
                         post {
                             blocks = domDocument?.visibleBlocks().orEmpty()
+                            refreshAccessibility()
                             invalidate()
                         }
                     }
                     blocks = domDocument?.visibleBlocks().orEmpty()
+                    accessibilityTree = ZorviAccessibilityTree.from(document)
+                    refreshAccessibility()
                     styleSheet = ZorviCssStyleSheet(css)
                     pageUrl = baseUrl
                     domDocument?.let { scriptRuntime.loadDocument(it, scripts) }
@@ -120,6 +124,14 @@ class ZorviEngineView(context: Context) : View(context) {
                 activeRequest.compareAndSet(call, null)
             }
         }
+    }
+
+    private fun refreshAccessibility() {
+        val labels = accessibilityTree.nodes.map { node ->
+            val role = node.role.replace('-', ' ')
+            if (role.isBlank()) node.label else "$role: ${node.label}"
+        }
+        contentDescription = labels.joinToString(". ").ifBlank { "Web page" }
     }
 
     override fun onDraw(canvas: Canvas) {
