@@ -336,3 +336,18 @@ Phase 7 has begun with graphics-layer components isolated from the in-progress l
 - Initial unit tests for image sample sizing and display-list geometry.
 
 This is a foundation only. It is not yet wired to the document/layout pipeline, and does not provide SVG, Canvas web APIs, image resource fetching, text shaping, clipping/transform stacks, GPU compositing, or browser-grade image format coverage. Integration should wait until the parallel Phase 4–6 interfaces are known.
+
+
+## Phase 8 implementation note (initial networking slice)
+
+The networking subsystem now has an initial, isolated implementation:
+
+- HTTP/1.1 requests using the Android/JVM `HttpURLConnection` stack.
+- HTTPS certificate validation delegated to the platform trust store; no permissive trust manager or certificate-error bypass is installed.
+- Explicit handling for 301, 302, 303, 307 and 308 redirects, with a redirect-count limit, HTTPS downgrade rejection, and cross-origin credential-header stripping.
+- Gzip and deflate response decoding, request timeouts, cancellation via connection disconnect, and a configurable decompressed-response byte limit.
+- A per-loader bounded LRU memory cache that stores only explicitly fresh public GET responses and respects no-store, no-cache and private directives.
+- An asynchronous resource loader with a bounded worker pool and request Accept profiles for documents, stylesheets, scripts, images, fonts and media.
+- Local HTTP regression tests for response bodies/headers, redirects, size limits, cache freshness and no-store behavior.
+
+This is not Phase 8 completion. HTTP/2, full cookie semantics (including SameSite), cache validators/revalidation (ETag/Last-Modified), CORS enforcement, mixed-content/referrer policy, streaming consumer APIs, resource priority/preload scheduling, and Android-device TLS/cancellation verification remain open. The current transport is HTTP/1.1; HTTP/2/3 support must be added only with a tested dependency/transport decision. The loader is not yet connected to HTML subresource discovery or the renderer. Certificate failures must continue to fail closed.
