@@ -10,6 +10,9 @@
 - Per-origin quota enforcement (default 256 Ki UTF-16 characters).
 - Unit tests for origin comparisons, bridge boundary checks, partition isolation,
   same-origin sharing, quota behavior and clearing.
+- An explicit private-session owner that keeps partitioned storage and an HTTP memory
+  cache in memory, clears both on close, rejects use after close, and supports idempotent
+  destruction. Five lifecycle tests cover cleanup and closed-session behavior.
 
 ## Explicit limitations
 
@@ -35,7 +38,8 @@ and must not expose Android Context, filesystem, reflection, secrets or networki
 2. Make every resource request pass through a single policy-enforcing loader.
 3. Add cookie parsing/storage with Secure, HttpOnly, SameSite and partition rules.
 4. Add persistent non-private storage with encryption/Android Keystore review.
-5. Add explicit ephemeral private-session ownership and destruction tests.
+5. Integrate the private-session owner with private tabs, the resource loader and browser
+   lifecycle so the final private tab closing reliably calls close().
 6. Implement CSP and sandbox policy before iframe/script execution expands.
 7. Threat-model renderer/bridge boundaries and document Android process-isolation limits.
 8. Run cross-origin, redirect, cookie and private-session regression suites.
