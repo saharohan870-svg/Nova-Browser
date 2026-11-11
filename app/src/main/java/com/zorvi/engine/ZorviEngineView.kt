@@ -7,8 +7,6 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.view.MotionEvent
 import android.view.View
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.concurrent.Executors
 import kotlin.math.max
 
@@ -45,54 +43,55 @@ class ZorviEngineView(context: Context) : View(context) {
     fun removeEventListener(type: String, handler: (ZorviEngineEvent) -> Unit) = engineEvents.removeEventListener(type, handler)
 
     fun loadUrl(address: String) {
-        val target = runCatching { URL(address) }.getOrNull()
-        if (target == null || target.protocol !in setOf("http", "https")) {
-            onLoadError?.invoke("Only HTTP and HTTPS are supported in this engine prototype")
+        val target = runCatching { ZorviUrl(address) }.getOrNull()
+        if (target == null || target.protocol !in setOf("http:", "https:")) {
+            onLoadError?.invoke("Only HTTP and HTTPS are supported in Zorvi")
             return
         }
         worker.execute {
             try {
-                val connection = (target.openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 12_000
-                    readTimeout = 15_000
-                    instanceFollowRedirects = true
-                    setRequestProperty("User-Agent", "ZorviEngine/0.1 (Android)")
-                    setRequestProperty("Accept", "text/html,application/xhtml+xml")
+                val response = ZorviHttpCall(
+                    ZorviHttpRequest(
+                        target,
+                        headers = mapOf("Accept" to "text/html,application/xhtml+xml"),
+                        maxResponseBytes = ZorviHttpRequest.DEFAULT_MAX_RESPONSE_BYTES
+                    )
+                ).execute()
+                require(response.statusCode in 200..299) { "HTTP ${response.statusCode}" }
+                val type = response.header("Content-Type").orEmpty()
+                require(type.contains("text/html", true) || type.contains("application/xhtml+xml", true)) {
+                    "Zorvi currently displays HTML documents only"
                 }
-                try {
-                    val type = connection.contentType.orEmpty()
-                    require(type.contains("text/html", true) || type.contains("application/xhtml+xml", true)) {
-                        "This prototype currently displays HTML documents only"
-                    }
-                    val html = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-                    val document = HtmlDocument.parse(html)
-                    val css = document.findAll("style").joinToString("\\n") { document.textContent(it) }
-                    val scripts = document.findAll("script")
-                        .filter { it.attributes["src"].isNullOrBlank() }
-                        .take(32)
-                        .map { document.textContent(it).take(64 * 1024) }
-                        .filter { it.isNotBlank() }
-                    val baseUrl = connection.url
-                    val title = document.findFirst("title")?.let(document::textContent)?.trim().orEmpty()
-                    post {
-                        domDocument = ZorviDomDocument.from(document)
-                        domDocument?.onMutation = {
-                            post {
-                                blocks = domDocument?.visibleBlocks().orEmpty()
-                                invalidate()
-                            }
+                val charset = Regex("charset=([^; ]+)", RegexOption.IGNORE_CASE)
+                    .find(type)?.groupValues?.get(1)?.trim('"', '\\'')
+                val encoding = runCatching { java.nio.charset.Charset.forName(charset ?: "UTF-8") }
+                    .getOrDefault(Charsets.UTF_8)
+                val html = response.body.toString(encoding)
+                val document = HtmlDocument.parse(html)
+                val css = document.findAll("style").joinToString("\\n") { document.textContent(it) }
+                val scripts = document.findAll("script")
+                    .filter { it.attributes["src"].isNullOrBlank() }
+                    .take(32)
+                    .map { document.textContent(it).take(64 * 1024) }
+                    .filter { it.isNotBlank() }
+                val baseUrl = java.net.URL(response.url.href)
+                val title = document.findFirst("title")?.let(document::textContent)?.trim().orEmpty()
+                post {
+                    domDocument = ZorviDomDocument.from(document)
+                    domDocument?.onMutation = {
+                        post {
+                            blocks = domDocument?.visibleBlocks().orEmpty()
+                            invalidate()
                         }
-                        blocks = domDocument?.visibleBlocks().orEmpty()
-                        styleSheet = ZorviCssStyleSheet(css)
-                        pageUrl = baseUrl
-                        domDocument?.let { scriptRuntime.loadDocument(it, scripts) }
-                        onPageTitle?.invoke(title)
-                        scrollYpx = 0f
-                        requestLayout()
-                        invalidate()
                     }
-                } finally {
-                    connection.disconnect()
+                    blocks = domDocument?.visibleBlocks().orEmpty()
+                    styleSheet = ZorviCssStyleSheet(css)
+                    pageUrl = baseUrl
+                    domDocument?.let { scriptRuntime.loadDocument(it, scripts) }
+                    onPageTitle?.invoke(title)
+                    scrollYpx = 0f
+                    requestLayout()
+                    invalidate()
                 }
             } catch (error: Exception) {
                 post { onLoadError?.invoke(error.message ?: "Page load failed") }
