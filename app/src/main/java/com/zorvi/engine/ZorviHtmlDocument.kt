@@ -53,9 +53,9 @@ internal data class HtmlDocument(val root: HtmlNode) {
                 stack += html
                 stack += body
             }
-            fun appendText(value: String) {
+            fun appendText(value: String, allowInHead: Boolean = false) {
                 if (value.isEmpty()) return
-                if (inHead && value.isNotBlank()) switchToBody()
+                if (inHead && value.isNotBlank() && !allowInHead) switchToBody()
                 val parent = current()
                 val decoded = decodeEntities(value)
                 val last = parent.children.lastOrNull()
@@ -109,7 +109,7 @@ internal data class HtmlDocument(val root: HtmlNode) {
                 if (parent.tag in rawTextTags) {
                     val closeStart = input.indexOf("</${parent.tag}", cursor, ignoreCase = true)
                     val end = if (closeStart < 0) input.length else closeStart
-                    appendText(input.substring(cursor, end))
+                    appendText(input.substring(cursor, end), allowInHead = true)
                     cursor = end
                     if (cursor >= input.length) break
                 }
