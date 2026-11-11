@@ -2,7 +2,11 @@
 
 ## Requirement
 
-Nova should aim for comparable installed storage and runtime RAM to current Chrome and Firefox on the same Android device, under equivalent workloads. Exact equality is not a meaningful fixed specification: browser version, Android build, pages, tabs, extensions/features, cache and downloads change measurements.
+Nova must support a low-memory Android phone with **4 GB physical RAM** and keep the downloadable install package **below 100 MB**. Runtime RAM and installed storage should be comparable to Chrome or Firefox on the same device under equivalent workloads. User data, browser cache and downloaded files may grow after installation; the initial APK/package size is the constrained deliverable.
+
+The 100 MB limit applies to the actual user-facing install download. If the Chromium packaging architecture requires split APKs, report the base APK and the total required download size; do not claim compliance based on the base split alone. Do not strip security features or essential browser functionality just to meet the limit. If a genuine Chromium build cannot meet the cap, report that blocker instead of shipping a WebView build as if it were standalone Chromium.
+
+Exact RAM equality is not a meaningful fixed specification: browser version, Android build, pages, tabs and cache change measurements.
 
 ## Measurement protocol
 
@@ -17,7 +21,12 @@ Run on the same physical ARM64 Android device and OS build:
 
 ## Optimization priorities
 
-- Build ARM64 only for the initial Nova phone target; do not bundle unused ABIs or debug symbols in release packages.
+- Target 4 GB RAM devices: keep background tabs discardable and restore them on demand; avoid retaining renderer processes unnecessarily.
+- Build ARM64 only for the initial Nova phone target; do not bundle unused ABIs, debug symbols, test assets or duplicate resources in release packages.
+- Enforce a sub-100 MB user-facing download budget and measure the complete required download, not just one split.
+- Prefer Chromium-supported Android component and split packaging where it genuinely reduces delivered size; account for all mandatory splits and runtime components.
+- Avoid duplicate browser engines, duplicate media codecs, bundled runtime copies and unnecessary assets.
+- Keep cache bounded and user data outside the APK; cache and downloads may grow after installation.
 - Use Chromium's normal Android low-memory behavior and background renderer prioritization; discard frozen/background renderers under memory pressure rather than keeping every tab resident.
 - Keep tab metadata and session state lightweight; restore discarded tabs on demand.
 - Bound HTTP cache and clean stale cache entries using Chromium's supported cache controls. Do not delete cookies, passwords, bookmarks or downloads as cache cleanup.
@@ -31,9 +40,9 @@ Run on the same physical ARM64 Android device and OS build:
 
 - Nova's median installed storage and runtime RAM should be in the same practical range as Chrome/Firefox for matched test scenarios on the target device.
 - No claim of "same" or "lighter" without a recorded comparison table and build/version identifiers.
-- No exact byte or MB target until Chrome and Firefox are measured on the target phone.
+- The install download must be below 100 MB; runtime RAM and installed storage parity must be measured against Chrome and Firefox on the target phone.
 - Preserve browser correctness, security and tab usability while optimizing.
 
 ## Current status
 
-This file defines targets only. No Chromium APK has yet been built, installed or benchmarked as Nova. The existing Nova v0.3.0 WebView APK is not a valid comparison for a standalone Chromium fork.
+This file defines targets only. No Chromium APK has yet been built, installed or benchmarked as Nova. The existing Nova v0.3.0 WebView APK is not a valid comparison for a standalone Chromium fork. The sub-100 MB download and 4 GB RAM targets are requirements, not yet verified results.
