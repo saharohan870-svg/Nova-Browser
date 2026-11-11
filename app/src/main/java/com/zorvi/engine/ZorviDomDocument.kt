@@ -1,10 +1,9 @@
 package com.zorvi.engine
 
 /**
- * A small DOM-like tree and mutation/event model for Zorvi Engine.
- *
- * This is an internal prototype API, not a complete WHATWG DOM implementation.
- * The document exposes a deliberately small synchronized bridge to the JavaScript runtime; standards-compliant DOM behavior is later work.
+ * Deliberately small DOM/event model. It is not a complete WHATWG DOM.
+ * Tree ownership is maintained by appendChild/removeChild; document event
+ * dispatch implements capture, target and bubble phases for this prototype.
  */
 internal class ZorviDomNode internal constructor(
     val tagName: String,
@@ -14,6 +13,13 @@ internal class ZorviDomNode internal constructor(
 ) {
     var parent: ZorviDomNode? = null
         private set
+
+    private data class Listener(
+        val callback: (ZorviDomEvent) -> Unit,
+        val capture: Boolean,
+        val once: Boolean
+    )
+    private val listeners = mutableMapOf<String, MutableList<Listener>>()
 
     fun appendChild(child: ZorviDomNode) {
         require(child !== this) { "A node cannot be appended to itself" }
@@ -41,7 +47,7 @@ internal class ZorviDomNode internal constructor(
         buildString { append(textContent); children.forEach { append(it.text()) } }
 
     fun descendants(): Sequence<ZorviDomNode> = sequence {
-        for (child in children) {
+        for (child in children.toList()) {
             yield(child)
             yieldAll(child.descendants())
         }
@@ -52,10 +58,29 @@ internal class ZorviDomNode internal constructor(
 
     fun findByTag(tag: String): List<ZorviDomNode> =
         descendants().filter { it.tagName.equals(tag, ignoreCase = true) }.toList()
+
+    internal fun addListener(type: String, capture: Boolean, once: Boolean, callback: (ZorviDomEvent) -> Unit) {
+        listeners.getOrPut(type.lowercase()) { mutableListOf() }.add(Listener(callback, capture, once))
+    }
+
+    internal fun removeListener(type: String, capture: Boolean, callback: (ZorviDomEvent) -> Unit) {
+        val key = type.lowercase()
+        listeners[key]?.removeAll { it.capture == capture && it.callback === callback }
+        if (listeners[key].isNullOrEmpty()) listeners.remove(key)
+    }
+
+    internal fun invokeListeners(event: ZorviDomEvent, capture: Boolean) {
+        val key = event.type
+        val snapshot = listeners[key]?.filter { it.capture == capture }.orEmpty()
+        for (listener in snapshot) {
+            if (event.immediatePropagationStopped) break
+            listener.callback(event)
+            if (listener.once) listeners[key]?.remove(listener)
+        }
+    }
 }
 
 internal class ZorviDomDocument internal constructor(val documentElement: ZorviDomNode) {
-    private val listeners = mutableMapOf<String, MutableList<(ZorviDomEvent) -> Unit>>()
     @Volatile var onMutation: (() -> Unit)? = null
 
     @Synchronized fun getElementById(id: String): ZorviDomNode? = documentElement.findById(id)
@@ -63,7 +88,6 @@ internal class ZorviDomDocument internal constructor(val documentElement: ZorviD
         if (documentElement.tagName.equals(tag, true)) listOf(documentElement) else documentElement.findByTag(tag)
 
     @Synchronized fun hasElement(id: String): Boolean = documentElement.findById(id) != null
-
     @Synchronized fun getTextById(id: String): String? = documentElement.findById(id)?.text()
 
     @Synchronized fun setTextById(id: String, value: String) {
@@ -93,14 +117,59 @@ internal class ZorviDomDocument internal constructor(val documentElement: ZorviD
         return HtmlDocument(convert(documentElement)).visibleBlocks()
     }
 
-    @Synchronized fun addEventListener(type: String, listener: (ZorviDomEvent) -> Unit) {
-        listeners.getOrPut(type.lowercase()) { mutableListOf() }.add(listener)
+    fun addEventListener(type: String, listener: (ZorviDomEvent) -> Unit) =
+        addEventListener(type, capture = false, once = false, listener = listener)
+
+    fun addEventListener(
+        type: String,
+        capture: Boolean,
+        once: Boolean = false,
+        listener: (ZorviDomEvent) -> Unit
+    ) {
+        documentElement.addListener(type, capture, once, listener)
     }
 
-    internal fun dispatch(type: String, target: ZorviDomNode) {
-        val callbacks = synchronized(this) { listeners[type.lowercase()]?.toList().orEmpty() }
-        val event = ZorviDomEvent(type.lowercase(), target)
-        callbacks.forEach { it(event) }
+    fun removeEventListener(type: String, listener: (ZorviDomEvent) -> Unit) =
+        removeEventListener(type, capture = false, listener = listener)
+
+    fun removeEventListener(type: String, capture: Boolean, listener: (ZorviDomEvent) -> Unit) {
+        documentElement.removeListener(type, capture, listener)
+    }
+
+    fun dispatch(type: String, target: ZorviDomNode, bubbles: Boolean = true, cancelable: Boolean = false): ZorviDomEvent {
+        val path = mutableListOf<ZorviDomNode>()
+        var current: ZorviDomNode? = target
+        while (current != null) {
+            path += current
+            current = current.parent
+        }
+        val event = ZorviDomEvent(type.lowercase(), target, bubbles, cancelable)
+
+        for (node in path.asReversed().drop(1)) {
+            if (event.propagationStopped) break
+            event.currentTarget = node
+            event.eventPhase = ZorviDomEvent.CAPTURING_PHASE
+            node.invokeListeners(event, capture = true)
+        }
+
+        if (!event.propagationStopped) {
+            event.currentTarget = target
+            event.eventPhase = ZorviDomEvent.AT_TARGET
+            target.invokeListeners(event, capture = true)
+            if (!event.immediatePropagationStopped) target.invokeListeners(event, capture = false)
+        }
+
+        if (bubbles && !event.propagationStopped) {
+            for (node in path.drop(1)) {
+                if (event.propagationStopped) break
+                event.currentTarget = node
+                event.eventPhase = ZorviDomEvent.BUBBLING_PHASE
+                node.invokeListeners(event, capture = false)
+            }
+        }
+        event.currentTarget = null
+        event.eventPhase = ZorviDomEvent.NONE
+        return event
     }
 
     companion object {
@@ -115,4 +184,34 @@ internal class ZorviDomDocument internal constructor(val documentElement: ZorviD
     }
 }
 
-internal data class ZorviDomEvent(val type: String, val target: ZorviDomNode)
+internal class ZorviDomEvent(
+    val type: String,
+    val target: ZorviDomNode,
+    val bubbles: Boolean,
+    val cancelable: Boolean
+) {
+    var currentTarget: ZorviDomNode? = null
+        internal set
+    var eventPhase: Int = NONE
+        internal set
+    var defaultPrevented: Boolean = false
+        private set
+    internal var propagationStopped: Boolean = false
+        private set
+    internal var immediatePropagationStopped: Boolean = false
+        private set
+
+    fun preventDefault() { if (cancelable) defaultPrevented = true }
+    fun stopPropagation() { propagationStopped = true }
+    fun stopImmediatePropagation() {
+        immediatePropagationStopped = true
+        propagationStopped = true
+    }
+
+    companion object {
+        const val NONE = 0
+        const val CAPTURING_PHASE = 1
+        const val AT_TARGET = 2
+        const val BUBBLING_PHASE = 3
+    }
+}
