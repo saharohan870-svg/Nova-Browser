@@ -88,3 +88,16 @@ The parser remains a deliberately incomplete HTML parser. It does not yet implem
 - **Verification:** pending CI. No passing build or test result is claimed.
 - **Integration constraint:** Phases 4–6 are being developed in another conversation. This increment deliberately adds isolated graphics primitives and does not modify layout, scripting, Web APIs, networking or the browser view.
 - **Known gaps:** no resource loader integration, SVG, web Canvas API, text shaping, glyph runs, clipping/transform stack, image cache, GPU acceleration, damage tracking, layer compositing or broad image-format conformance.
+
+
+## Phase 10 — initial accessibility semantics increment (2026-11-11)
+
+- Added `ZorviAccessibilityTree` to extract accessible roles and names from the supported HTML tree.
+- Supports heading levels, links, buttons, text fields, checkbox, radio button, slider, spin button, image, navigation, main and form semantics.
+- Supports `aria-label`, image `alt`, associated `label[for]`, placeholder and title naming; excludes hidden and aria-hidden content.
+- Exposed a page-level Android View content description and refreshes it when the DOM mutation callback runs.
+- Added four JVM regression tests in `ZorviAccessibilityTest`.
+- Fixed the malformed character literal in `ZorviEngineView.kt` response charset parsing.
+- **Commits:** `8d481a21e93c62f6785b71b2280c56870fd7eca6`, `0cfcbbbcbbf5d3fd7bc5cbd30f515c6d57912008`, `ed5ebab8598db62a00e2dc9974dfc1f738d90e52`.
+- **Verification:** CI not yet confirmed at the time of this entry. Do not mark Phase 10 complete.
+- **Known gaps:** no virtual accessibility children/focus navigation/actions, functional form rendering/submission, media playback, captions, zoom, selection, find-in-page, RTL, printing/PDF or TalkBack device verification.
