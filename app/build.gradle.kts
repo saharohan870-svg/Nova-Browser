@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.nova.browser"
+    namespace = "com.zorvi.browser"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.nova.browser"
+        applicationId = "com.zorvi.browser"
         minSdk = 26
         targetSdk = 35
         versionCode = 3
