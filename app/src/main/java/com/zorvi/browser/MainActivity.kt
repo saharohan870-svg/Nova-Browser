@@ -160,8 +160,8 @@ class MainActivity : Activity() {
             override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) { tab.canGoBack = canGoBack }
             override fun onCanGoForward(session: GeckoSession, canGoForward: Boolean) { tab.canGoForward = canGoForward }
             override fun onNewSession(session: GeckoSession, uri: String): GeckoResult<GeckoSession> {
-                runOnUiThread { newTab("about:blank") }
-                return GeckoResult.fromValue(tabs.lastOrNull()?.session)
+                newTab("about:blank")
+                return GeckoResult.fromValue(current()!!.session)
             }
             override fun onLocationChange(
                 session: GeckoSession,
