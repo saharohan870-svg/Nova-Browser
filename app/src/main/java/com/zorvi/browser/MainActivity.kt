@@ -825,25 +825,73 @@ class MainActivity : Activity() {
     }
 
     private fun createGroup() {
-        val input = EditText(this).apply { hint = "Group name" }
+        val input = EditText(this).apply { hint = "Group name"; isSingleLine = true }
         AlertDialog.Builder(this).setTitle("Create tab group").setView(input)
             .setPositiveButton("Create") { _, _ ->
                 val name = input.text.toString().trim().take(30)
-                if (name.isNotEmpty()) {
+                val exists = tabs.any { !it.private && it.group.equals(name, true) }
+                if (name.isNotEmpty() && !exists) {
                     prefs.edit().putString("active_group", name).apply()
-                    newTab("https://www.google.com")
-                }
+                    newTab(homePage())
+                } else if (exists) Toast.makeText(this, "A group with that name already exists", Toast.LENGTH_SHORT).show()
             }.setNegativeButton("Cancel", null).show()
     }
 
     private fun manageGroups() {
-        val groups = (tabs.filter { !it.private }.map { it.group } + "General").distinct().toTypedArray()
-        AlertDialog.Builder(this).setTitle("Tab groups").setItems(groups) { _, index ->
-            val name = groups[index]
-            prefs.edit().putString("active_group", name).apply()
-            val found = tabs.indexOfLast { !it.private && it.group == name }
-            if (found >= 0) { active = found; showOnlyActive(); updateTabs() } else newTab("https://www.google.com")
-        }.setPositiveButton("New group") { _, _ -> createGroup() }.show()
+        val groups = (tabs.filter { !it.private }.map { it.group } + "General").distinct().sorted()
+        AlertDialog.Builder(this).setTitle("Tab groups").setItems(groups.toTypedArray()) { _, index ->
+            showGroupActions(groups[index])
+        }.setPositiveButton("New group") { _, _ -> createGroup() }.setNegativeButton("Close", null).show()
+    }
+
+    private fun showGroupActions(name: String) {
+        val count = tabs.count { !it.private && it.group == name }
+        val actions = arrayOf("Open group ($count tabs)", "Move current tab here", "Rename group", "Delete group")
+        AlertDialog.Builder(this).setTitle(name).setItems(actions) { _, which ->
+            when (which) {
+                0 -> {
+                    val found = tabs.indexOfLast { !it.private && it.group == name }
+                    if (found >= 0) { active = found; showOnlyActive(); updateTabs() }
+                    else { prefs.edit().putString("active_group", name).apply(); newTab(homePage()) }
+                }
+                1 -> moveCurrentTabToGroup(name)
+                2 -> renameGroup(name)
+                3 -> deleteGroup(name)
+            }
+        }.setNegativeButton("Back") { _, _ -> manageGroups() }.show()
+    }
+
+    private fun moveCurrentTabToGroup(name: String) {
+        val tab = current() ?: return
+        if (tab.private) { Toast.makeText(this, "Private tabs cannot join regular groups", Toast.LENGTH_SHORT).show(); return }
+        tab.group = name
+        prefs.edit().putString("active_group", name).apply()
+        saveTabs(); updateTabs()
+        Toast.makeText(this, "Tab moved to " + name, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun renameGroup(oldName: String) {
+        val input = EditText(this).apply { setText(oldName); isSingleLine = true }
+        AlertDialog.Builder(this).setTitle("Rename group").setView(input)
+            .setPositiveButton("Save") { _, _ ->
+                val newName = input.text.toString().trim().take(30)
+                if (newName.isNotEmpty() && !tabs.any { !it.private && it.group.equals(newName, true) && it.group != oldName }) {
+                    tabs.filter { !it.private && it.group == oldName }.forEach { it.group = newName }
+                    if (prefs.getString("active_group", "General") == oldName) prefs.edit().putString("active_group", newName).apply()
+                    saveTabs(); updateTabs()
+                } else Toast.makeText(this, "Invalid or duplicate group name", Toast.LENGTH_SHORT).show()
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun deleteGroup(name: String) {
+        if (name == "General") { Toast.makeText(this, "General group cannot be deleted", Toast.LENGTH_SHORT).show(); return }
+        AlertDialog.Builder(this).setTitle("Delete " + name + "?")
+            .setMessage("Tabs in this group will be moved to General. No tabs will be closed.")
+            .setPositiveButton("Delete") { _, _ ->
+                tabs.filter { !it.private && it.group == name }.forEach { it.group = "General" }
+                if (prefs.getString("active_group", "General") == name) prefs.edit().putString("active_group", "General").apply()
+                saveTabs(); updateTabs()
+            }.setNegativeButton("Cancel", null).show()
     }
 
     private fun saveTabs() {
@@ -887,9 +935,14 @@ class MainActivity : Activity() {
                 val request = DownloadManager.Request(Uri.parse(url)).setTitle(name)
                     .setDescription("Downloading with Nova Browser")
                     .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    .setAllowedOverMetered(true).setAllowedOverRoaming(false)
                     .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name)
                 if (!mime.isNullOrBlank()) request.setMimeType(mime.substringBefore(';'))
-                (getSystemService(DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
+                val id = (getSystemService(DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
+                val records = runCatching { JSONArray(prefs.getString("download_ids", "[]")) }.getOrDefault(JSONArray())
+                records.put(id)
+                while (records.length() > 100) records.remove(0)
+                prefs.edit().putString("download_ids", records.toString()).apply()
                 Toast.makeText(this, "Download queued: " + name, Toast.LENGTH_LONG).show()
             }.onFailure { Toast.makeText(this, "Download failed: " + it.message, Toast.LENGTH_LONG).show() }
             return
@@ -925,8 +978,61 @@ class MainActivity : Activity() {
     }
 
     private fun showDownloads() {
-        try { startActivity(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)) }
-        catch (_: Exception) { Toast.makeText(this, "Open Downloads in your Files app", Toast.LENGTH_SHORT).show() }
+        val manager = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
+        val ids = runCatching { JSONArray(prefs.getString("download_ids", "[]")) }.getOrDefault(JSONArray())
+        val entries = mutableListOf<Long>()
+        val labels = mutableListOf<String>()
+        val cursor = manager.query(DownloadManager.Query())
+        cursor?.use {
+            val idCol = it.getColumnIndex(DownloadManager.COLUMN_ID)
+            val titleCol = it.getColumnIndex(DownloadManager.COLUMN_TITLE)
+            val statusCol = it.getColumnIndex(DownloadManager.COLUMN_STATUS)
+            val bytesCol = it.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+            val totalCol = it.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+            val reasonCol = it.getColumnIndex(DownloadManager.COLUMN_REASON)
+            while (it.moveToNext()) {
+                val id = it.getLong(idCol)
+                if ((0 until ids.length()).any { n -> ids.optLong(n) == id }) {
+                    entries.add(id)
+                    val status = when (it.getInt(statusCol)) {
+                        DownloadManager.STATUS_PENDING -> "Pending"
+                        DownloadManager.STATUS_RUNNING -> "Downloading"
+                        DownloadManager.STATUS_PAUSED -> "Paused"
+                        DownloadManager.STATUS_SUCCESSFUL -> "Complete"
+                        else -> "Failed"
+                    }
+                    val bytes = it.getLong(bytesCol).coerceAtLeast(0)
+                    val total = it.getLong(totalCol)
+                    val progress = if (total > 0) " · " + (bytes * 100 / total) + "%" else ""
+                    val reason = if (it.getInt(statusCol) == DownloadManager.STATUS_FAILED) " · Error " + it.getInt(reasonCol) else ""
+                    labels.add((it.getString(titleCol) ?: "Download") + " — " + status + progress + reason)
+                }
+            }
+        }
+        if (labels.isEmpty()) {
+            AlertDialog.Builder(this).setTitle("Downloads").setMessage("No Nova-managed downloads found.")
+                .setPositiveButton("Open Android downloads") { _, _ ->
+                    runCatching { startActivity(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)) }
+                }.setNegativeButton("Close", null).show()
+            return
+        }
+        AlertDialog.Builder(this).setTitle("Downloads").setItems(labels.toTypedArray()) { _, which ->
+            val id = entries[which]
+            AlertDialog.Builder(this).setItems(arrayOf("Open Android downloads", "Remove from Nova list", "Delete downloaded file")) { _, action ->
+                when (action) {
+                    0 -> runCatching { startActivity(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)) }
+                    1 -> {
+                        val updated = JSONArray()
+                        for (i in 0 until ids.length()) if (ids.optLong(i) != id) updated.put(ids.optLong(i))
+                        prefs.edit().putString("download_ids", updated.toString()).apply()
+                    }
+                    2 -> AlertDialog.Builder(this).setMessage("Delete this downloaded file?")
+                        .setPositiveButton("Delete") { _, _ -> manager.remove(id) }.setNegativeButton("Cancel", null).show()
+                }
+            }.show()
+        }.setPositiveButton("Refresh", null).setNegativeButton("Android downloads") { _, _ ->
+            runCatching { startActivity(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)) }
+        }.show()
     }
 
     private fun setBrowserFullScreen(enabled: Boolean) {
