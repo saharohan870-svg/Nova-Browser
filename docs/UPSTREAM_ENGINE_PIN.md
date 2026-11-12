@@ -23,7 +23,7 @@ The Brave browser commit explicitly pins `brave-core` to the `v1.99.56` tag. At 
 
 ## Verification
 
-Run `scripts/verify_upstream_pins.sh` before any source sync. It checks that upstream Git refs still resolve to the recorded immutable commits. A changed ref is a stop condition requiring review, not an automatic pin update.
+Run `python3 scripts/verify_upstream_pins.py` before any source sync. It checks that upstream Git refs still resolve to the recorded immutable commits. A changed ref is a stop condition requiring review, not an automatic pin update.
 
 This is a source pin, not a completed source checkout. The full synchronized checkout must still record the Chromium revision from the actual `src/DEPS`/gclient solution before compiling. Do not silently substitute the tag's commit SHA for the resolved DEPS revision.
 
