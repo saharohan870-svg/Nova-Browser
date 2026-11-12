@@ -84,6 +84,13 @@ class ZorviHtmlDocumentTest {
         assertEquals("Tom & Jerry", document.textContent(document.findFirst("title")!!))
     }
 
+
+    @Test fun preservesSlashesInUnquotedAttributeValues() {
+        val document = HtmlDocument.parse("<a href=https://example.com/path/>Open</a><img src=/assets/icon.png>")
+        assertEquals("https://example.com/path/", document.findFirst("a")!!.attributes["href"])
+        assertEquals("/assets/icon.png", document.findFirst("img")!!.attributes["src"])
+    }
+
     @Test fun malformedInputsDoNotCrashParser() {
         val samples = listOf(
             "<", "<<<<", "<a href='unterminated", "<div><span><p>x</div>",
