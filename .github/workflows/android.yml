@@ -15,6 +15,10 @@ on:
       - 'settings.gradle.kts'
       - '.github/workflows/android.yml'
 
+concurrency:
+  group: zorvi-android-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
