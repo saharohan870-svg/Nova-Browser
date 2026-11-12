@@ -4,8 +4,8 @@ Status: implementation in progress; not build-verified or device-tested.
 
 ## Implemented in this pass
 
-- **AI assistant shortcut:** accepts a question and opens ChatGPT in a new tab with the question in its URL query.
-- **AI page-summary handoff:** opens ChatGPT in a new tab with the current page URL and a summary request. This is a URL handoff, not native extraction of page text; the AI site must be able to access the page.
+- **AI assistant:** accepts a question and lets the user choose Perplexity or ChatGPT; opens the selected website with the prompt.
+- **AI page-summary handoff:** lets the user choose Perplexity or ChatGPT and passes the current page URL with a summary request. This is a URL handoff, not native extraction of page text; the AI site must be able to access the page.
 - **Page translation:** hands the current URL to Google Translate and currently targets English.
 - **Reader view entry:** opens Gecko's `about:reader` route for the current page where supported.
 - **Custom home page:** user can set a URL used by Home and new tabs.
