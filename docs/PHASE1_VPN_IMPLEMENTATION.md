@@ -94,3 +94,18 @@ Once provider access is available, implementation can continue against its actua
 ## Release gate
 
 Phase 1 is complete only when a release build connects to real provider gateways, shows truthful connection state, passes the routing/leak tests above on a physical Android device, and includes accurate provider/privacy disclosures. A successful compile or CI run alone is not evidence of VPN protection.
+
+
+## Provider candidates researched (not approved or contacted)
+
+These are integration leads, not endorsements. Public partner pages do not establish that Nova has been accepted, that pricing is suitable, or that SDK access is available to an individual project.
+
+| Candidate | Publicly described option | Important caveat |
+|---|---|---|
+| AdGuard VPN | White-label VPN SDK and provider infrastructure: https://adguardpartner.com/en/white-label-vpn.html | Requires a partner enquiry and commercial agreement; SDK docs/access are not public. |
+| KeepSolid VPN Unlimited OEM | VPN SDK/API and white-label infrastructure: https://oem.vpnunlimited.com/ | Requires provider onboarding and commercial terms. |
+| WLVPN / VIPRE | VPN SDKs and reseller API: https://wlvpn.com/ | Requires partner access and credentials. |
+| Windscribe | Backend API integration or reseller partnership: https://windscribe.com/white-label-vpn | Windscribe states it does not provide an SDK; API integration is a longer engineering path. |
+
+**Preliminary engineering fit:** AdGuard, KeepSolid and WLVPN publicly describe SDK-style integration, which is closer to Nova's desired in-app experience. No candidate is selected. Compare written quotes, SDK documentation, Android sample app, service geography, privacy/audit evidence, and minimum commitments before choosing.
+
