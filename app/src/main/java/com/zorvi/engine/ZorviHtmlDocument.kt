@@ -256,6 +256,12 @@ internal data class HtmlDocument(
                     closeOpenInScope("caption", setOf("table"))
                     closeOpenInScope("colgroup", setOf("table"))
                 }
+                // A col directly under table belongs to an implied colgroup.
+                if (name == "col" && current().tag == "table") {
+                    val impliedColumns = HtmlNode("colgroup")
+                    current().children += impliedColumns
+                    stack += impliedColumns
+                }
                 // The tree builder inserts missing table section and row containers.
                 if (name == "tr" && current().tag == "table") {
                     val impliedBody = HtmlNode("tbody")
