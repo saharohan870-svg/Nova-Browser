@@ -82,7 +82,7 @@ internal data class HtmlDocument(val root: HtmlNode) {
                     while (i < sourceTag.length && (sourceTag[i].isWhitespace() || sourceTag[i] == '/')) i++
                     if (i >= sourceTag.length || sourceTag[i] == '>') break
                     val start = i
-                    while (i < sourceTag.length && !sourceTag[i].isWhitespace() && sourceTag[i] !in charArrayOf('=', '/', '>')) i++
+                    while (i < sourceTag.length && !sourceTag[i].isWhitespace() && sourceTag[i] !in charArrayOf('=', '>')) i++
                     if (i == start) { i++; continue }
                     val name = sourceTag.substring(start, i).lowercase()
                     while (i < sourceTag.length && sourceTag[i].isWhitespace()) i++
@@ -98,8 +98,9 @@ internal data class HtmlDocument(val root: HtmlNode) {
                             if (i < sourceTag.length) i++
                         } else {
                             val valueStart = i
+                            // A slash is valid inside an unquoted value (for example, href=https://host/path/).
                             while (i < sourceTag.length && !sourceTag[i].isWhitespace() && sourceTag[i] != '>') i++
-                            value = sourceTag.substring(valueStart, i).trimEnd('/')
+                            value = sourceTag.substring(valueStart, i)
                         }
                     }
                     if (name.isNotEmpty() && name !in result) result[name] = decodeEntities(value)
