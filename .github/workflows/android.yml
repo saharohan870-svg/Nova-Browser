@@ -5,6 +5,7 @@ on:
     branches: [ main, chromium-engine-migration ]
     paths:
       - 'app/**'
+      - 'tests/**'
       - 'gradle/**'
       - 'gradle.properties'
       - '*.gradle*'
