@@ -107,10 +107,19 @@ class ZorviHtmlDocumentTest {
         assertEquals("/assets/icon.png", document.findFirst("img")!!.attributes["src"])
     }
 
+    @Test fun insertsImpliedTableBodyAndRowForCells() {
+        val document = HtmlDocument.parse("<table><td>A<td>B</table>")
+        val table = document.findFirst("table")!!
+        val tbody = table.children.single { it.tag == "tbody" }
+        val row = tbody.children.single { it.tag == "tr" }
+        assertEquals(2, row.children.count { it.tag == "td" })
+    }
+
     @Test fun closesTableCellsAndRowsWhenEndTagsAreOmitted() {
         val document = HtmlDocument.parse("<table><tr><td>A<td>B<tr><td>C</table>")
         val table = document.findFirst("table")!!
-        val rows = table.children.filter { it.tag == "tr" }
+        val tbody = table.children.single { it.tag == "tbody" }
+        val rows = tbody.children.filter { it.tag == "tr" }
         assertEquals(2, rows.size)
         assertEquals(2, rows[0].children.count { it.tag == "td" })
         assertEquals(1, rows[1].children.count { it.tag == "td" })
