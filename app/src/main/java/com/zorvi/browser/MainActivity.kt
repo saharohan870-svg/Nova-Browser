@@ -141,9 +141,9 @@ class MainActivity : Activity() {
             }
         })
         session.contentDelegate = object : GeckoSession.ContentDelegate {
-            override fun onTitleChange(session: GeckoSession, title: String) {
+            override fun onTitleChange(session: GeckoSession, title: String?) {
                 val tab = tabs.firstOrNull { it.session === session } ?: return
-                tab.title = title.ifBlank { "New tab" }
+                tab.title = title?.takeIf { it.isNotBlank() } ?: "New tab"
                 if (session === activeSession()) updateTabs()
             }
         }
