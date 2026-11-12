@@ -201,6 +201,9 @@ internal data class HtmlDocument(
                 }
                 closeParagraphIfNeeded(name)
                 when (name) {
+                    "a" -> closeOpen("a")
+                    "button" -> closeOpen("button")
+                    "nobr" -> closeOpen("nobr")
                     "li" -> closeOpenInScope("li", setOf("ul", "ol"))
                     "dt", "dd" -> {
                         closeOpenInScope("dt", setOf("dl"))
