@@ -54,7 +54,6 @@ internal class ZorviScriptRuntime : AutoCloseable {
         val js = QuickJs.create(Dispatchers.IO)
         js.memoryLimit = 12L * 1024L * 1024L
         js.maxStackSize = 256L * 1024L
-        js.evaluationTimeoutMillis = 1_000L
         runtime = js
 
         js.define("zorviNative") {
