@@ -1,0 +1,22 @@
+{
+  "manifest_version": 2,
+  "name": "Nova Network Filter",
+  "version": "1.0.0",
+  "description": "Blocks known advertising and tracking network endpoints in Nova Browser.",
+  "applications": {
+    "gecko": {
+      "id": "nova-adblock@zorvi.browser",
+      "strict_min_version": "109.0"
+    }
+  },
+  "permissions": [
+    "webRequest",
+    "webRequestBlocking",
+    "<all_urls>"
+  ],
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  }
+}
