@@ -1,59 +1,68 @@
-# Seven-Site Browser Compatibility Test Plan
+# Nova Browser — Phase 2 Website Compatibility Plan
 
-## Scope
+## Phase 2 objective
 
-This checklist covers the seven requested compatibility targets on the Android browser:
+Prepare the GeckoView-based browser for modern web applications, with special attention to major AI chat websites. The list below is a test target, not a claim that every site has passed.
 
-1. Google — search, account sign-in, redirect/cookie persistence.
-2. YouTube — page load, video playback, fullscreen, playback controls.
-3. GitHub — repository pages, code rendering, sign-in, OAuth redirects.
-4. Instagram — feed load, image/video media, scrolling, sign-in.
-5. Discord — web-app boot, JavaScript execution, sign-in, voice UI availability.
-6. WhatsApp Web — QR page load, QR rendering, device-link flow.
-7. Microsoft 365 — Microsoft sign-in, app launcher, Word/Excel web app startup and editing surface.
+## AI website targets
 
-## Important engine status
-
-The current default browser screen in this branch is still backed by Android System WebView (android.webkit.WebView). The separate Zorvi experimental page is a custom Kotlin renderer and is not suitable for these modern sites. GeckoView is not yet integrated in the current app module. Therefore, results from this checklist must not be described as GeckoView results.
-
-## Test status
-
-No real-device site test is recorded yet. CI builds and unit tests do not prove that these sites render or authenticate correctly in a browser.
-
-| Site | Required checks | Status |
+| Website | Official web app | Core compatibility checks |
 |---|---|---|
-| Google | Search, sign-in, account persistence | Not run on device |
-| YouTube | Video, fullscreen, controls | Not run on device |
-| GitHub | Repo/code pages, sign-in/OAuth | Not run on device |
-| Instagram | Feed, image/video, scrolling | Not run on device |
-| Discord | Web app boot, sign-in, voice UI | Not run on device |
-| WhatsApp Web | QR rendering, device linking | Not run on device |
-| Microsoft 365 | Sign-in, Word/Excel app launch, editing surface | Not run on device |
+| ChatGPT | https://chatgpt.com/ | Sign-in, chat streaming, attachments, voice UI, long conversations |
+| Claude | https://claude.ai/ | Sign-in, streaming, file uploads, artifacts |
+| Google Gemini | https://gemini.google.com/ | Google sign-in, streaming, uploads, multimodal UI |
+| Microsoft Copilot | https://copilot.microsoft.com/ | Microsoft sign-in, chat streaming, file input |
+| Perplexity | https://www.perplexity.ai/ | Sign-in, streamed answers, citations, file input |
+| Grok | https://grok.com/ | Sign-in, streaming, media UI |
+| DeepSeek | https://chat.deepseek.com/ | Sign-in, long streamed responses, attachments |
+| Mistral Le Chat | https://chat.mistral.ai/ | Sign-in, streaming, file input |
+| Meta AI | https://www.meta.ai/ | Sign-in, chat and media UI |
 
-## Manual run procedure
+## Other major web targets
 
-Use the same APK build and the same Android device for all seven tests. Record the app version, Android version, device model, test date, and any error text.
+| Website | Official web app | Core compatibility checks |
+|---|---|---|
+| Google Search | https://www.google.com/ | Search, sign-in, redirects and cookies |
+| YouTube | https://www.youtube.com/ | Playback, controls, fullscreen and media |
+| GitHub | https://github.com/ | Repository/code rendering, sign-in and OAuth |
+| Instagram | https://www.instagram.com/ | Feed, image/video, scrolling and sign-in |
+| Discord | https://discord.com/app | App boot, sign-in, realtime UI and voice entry |
+| WhatsApp Web | https://web.whatsapp.com/ | QR rendering and device-link flow |
+| Microsoft 365 | https://www.microsoft365.com/ | Sign-in, app launch and Word/Excel editing surface |
 
-For each site:
-1. Open a fresh normal tab and navigate to the official HTTPS site.
-2. Wait for the page's initial load to finish; note blank screens, reload loops, browser crashes, or persistent spinners.
-3. Test the site-specific checks listed above.
-4. Close and reopen the tab, then verify whether the expected session state persists.
-5. Repeat once in a fresh tab if the first run is inconclusive.
+## Browser-side compatibility work
 
-Do not enter account passwords or one-time codes into test reports. For WhatsApp Web, do not share the QR code or linked-device session details. For Microsoft 365 and Google, report only whether authentication completed, not credentials or private content.
+- GeckoView is the main page renderer in the current migration branch.
+- JavaScript is explicitly enabled for web-app sessions.
+- Tracking protection is enabled by default.
+- Mobile and desktop user-agent modes are available, with desktop viewport mode configured separately.
+- AI and major-site shortcut menus are available in the browser UI.
+- Existing upload and camera/microphone permission handlers are intended to support web-app workflows.
+- Popup/new-window handling and session persistence are implemented but still require device verification.
 
-## Pass criteria
+## Required test procedure
 
-- Pass: all listed site-specific checks work in the target browser on the target device.
-- Partial: the site loads but one or more listed features fail or are blocked by the site/device.
-- Fail: the page does not load, crashes, loops, or cannot reach its basic app surface.
-- Not run: no real-device browser test has been completed.
+Use one APK and one device for all sites. Record app version, GeckoView version, Android version, device model, date, and result. Do not put passwords, one-time codes, QR codes, private chats, or private documents into reports.
 
-## Current automated verification
+For each AI site:
+1. Load the official HTTPS web app in a fresh normal tab.
+2. Check initial app boot, JavaScript execution and responsive layout.
+3. Complete sign-in privately; record only whether it succeeded.
+4. Send a harmless test prompt and verify that streamed output appears and completes.
+5. Test file upload where the site offers it, using a non-sensitive sample.
+6. Switch to desktop mode and reload; check whether the desktop layout works.
+7. Open a second tab, return to the first, and check that the page/session remains usable.
+8. Check browser back/forward, reload, and tab restoration.
 
-The GitHub Actions Android workflow runs Gradle unit tests, assembles the debug APK, checks that the APK exists and is below the configured size ceiling, and uploads it as an artifact. These checks are build verification only; they do not automate account sign-in, video playback, QR device linking, or Office editing.
+For other major sites, run the site-specific checks in the tables above. YouTube requires an actual video playback/fullscreen check. WhatsApp QR codes and linked-device details must never be captured in screenshots or shared.
 
-## Next required step
+## Result labels
 
-Integrate and build the approved GeckoView engine before treating this matrix as the GeckoView compatibility test. Then install that APK on the target Android device and execute the seven site-specific checks. Automated CI can validate compilation and local tests, but authenticated flows and real media playback still require device-level verification.
+- **Pass:** all listed checks succeed on the target device.
+- **Partial:** the site loads but one or more checks fail or are blocked.
+- **Fail:** the site does not reach its basic usable app surface, crashes, or loops.
+- **Not run:** no device test has been performed.
+
+## Current status
+
+All 16 websites are **Not run**. The current work adds shortcuts and browser compatibility controls; it does not prove successful login, streaming, voice, media, uploads or app functionality. Automated build verification and all manual site testing remain for the final testing phase.
