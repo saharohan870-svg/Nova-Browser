@@ -35,7 +35,7 @@ jobs:
         with:
           packages: platform-tools
       - name: Install required Android SDK packages
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - name: Build and test debug APK
         run: gradle testDebugUnitTest assembleDebug --stacktrace
       - name: Check APK download size
