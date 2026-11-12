@@ -15,6 +15,17 @@ android {
         versionName = "0.3.0"
     }
 
+    // Ship only the 64-bit ARM native libraries used by current Android phones.
+    // Avoid bundling x86 and 32-bit ARM Gecko binaries into an oversized APK.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a")
+            isUniversalApk = false
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
