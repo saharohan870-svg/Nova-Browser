@@ -91,6 +91,31 @@ class ZorviHtmlDocumentTest {
         assertEquals("/assets/icon.png", document.findFirst("img")!!.attributes["src"])
     }
 
+    @Test fun closesTableCellsAndRowsWhenEndTagsAreOmitted() {
+        val document = HtmlDocument.parse("<table><tr><td>A<td>B<tr><td>C</table>")
+        val table = document.findFirst("table")!!
+        val rows = table.children.filter { it.tag == "tr" }
+        assertEquals(2, rows.size)
+        assertEquals(2, rows[0].children.count { it.tag == "td" })
+        assertEquals(1, rows[1].children.count { it.tag == "td" })
+    }
+
+    @Test fun decodesCommonNamedAndWindows1252NumericReferences() {
+        val document = HtmlDocument.parse("<p>&euro; &mdash; &hellip; &#x80; &#128;</p>")
+        assertEquals("€ — … € €", document.textContent(document.findFirst("p")!!))
+    }
+
+    @Test fun handlesDoctypeWithQuotedGreaterThanCharacter() {
+        val document = HtmlDocument.parse("<!DOCTYPE html PUBLIC \"x>y\"><p>Content</p>")
+        assertEquals("Content", document.textContent(document.findFirst("p")!!))
+    }
+
+    @Test fun boundsNestingDepthOnAdversarialMarkup() {
+        val source = "<div>".repeat(2_000) + "safe" + "</div>".repeat(2_000)
+        val document = HtmlDocument.parse(source)
+        assertTrue(document.textContent(document.findFirst("body")!!).contains("safe"))
+    }
+
     @Test fun malformedInputsDoNotCrashParser() {
         val samples = listOf(
             "<", "<<<<", "<a href='unterminated", "<div><span><p>x</div>",
