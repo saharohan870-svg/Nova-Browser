@@ -6,6 +6,7 @@ on:
     paths:
       - 'app/**'
       - 'gradle/**'
+      - 'gradle.properties'
       - '*.gradle*'
       - 'settings.gradle*'
       - '.github/workflows/android.yml'
