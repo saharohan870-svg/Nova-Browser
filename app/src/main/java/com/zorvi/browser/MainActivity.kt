@@ -46,6 +46,8 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Clear leftovers from a prior session, including one terminated unexpectedly.
+        clearPrivateProfileData()
         buildUi()
         newTab("https://www.google.com")
     }
@@ -438,6 +440,7 @@ class MainActivity : Activity() {
         pages.forEach { it.stopLoading(); it.destroy() }
         pages.clear()
         privateTabs.clear()
+        clearPrivateProfileData()
         super.onDestroy()
     }
 
