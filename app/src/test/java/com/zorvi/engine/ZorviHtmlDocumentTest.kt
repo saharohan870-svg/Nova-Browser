@@ -107,6 +107,14 @@ class ZorviHtmlDocumentTest {
         assertEquals("/assets/icon.png", document.findFirst("img")!!.attributes["src"])
     }
 
+    @Test fun insertsImpliedColgroupForTableColumns() {
+        val document = HtmlDocument.parse("<table><col><col span=2><tr><td>Cell</table>")
+        val table = document.findFirst("table")!!
+        val colgroup = table.children.first { it.tag == "colgroup" }
+        assertEquals(2, colgroup.children.count { it.tag == "col" })
+        assertTrue(table.children.any { it.tag == "tbody" })
+    }
+
     @Test fun insertsImpliedTableBodyAndRowForCells() {
         val document = HtmlDocument.parse("<table><td>A<td>B</table>")
         val table = document.findFirst("table")!!
