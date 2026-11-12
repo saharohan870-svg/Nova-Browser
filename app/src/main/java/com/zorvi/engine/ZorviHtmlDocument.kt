@@ -248,6 +248,11 @@ internal data class HtmlDocument(
                 }
                 if (name in headingTags) headingTags.forEach(::closeOpen)
 
+                // Close caption/column-group context before switching to table rows.
+                if (name in setOf("tbody", "thead", "tfoot", "tr", "td", "th")) {
+                    closeOpenInScope("caption", setOf("table"))
+                    closeOpenInScope("colgroup", setOf("table"))
+                }
                 // The tree builder inserts missing table section and row containers.
                 if (name == "tr" && current().tag == "table") {
                     val impliedBody = HtmlNode("tbody")
