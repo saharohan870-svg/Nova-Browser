@@ -4,11 +4,11 @@ An Android browser powered by Mozilla GeckoView (the Gecko engine used by Firefo
 
 ## Engine
 
-- Rendering engine: Mozilla GeckoView stable 159.0.20261102144711, bundled from Mozilla's Maven repository.
+- Rendering engine: Mozilla GeckoView 128.0.20240725162350, bundled from Mozilla's Maven repository.
 - JavaScript engine: SpiderMonkey (included in GeckoView); no Android System WebView or QuickJS rendering fallback.
 - Compatibility mode: sends a Chrome-for-Android style user-agent to improve compatibility with sites that gate content on browser identification. This changes server-side browser detection only; it does not turn Gecko into Chromium or add Chromium-only APIs.
 - Tracking protection: GeckoView tracking protection is enabled per session.
-- Private tabs: use GeckoView's isolated private-mode sessions.
+- Private tabs: use GeckoView private-mode sessions.
 
 ## Browser features
 
@@ -23,7 +23,7 @@ Open this repository in Android Studio, allow Gradle sync, then build the app de
 
 ## Compatibility limits
 
-GeckoView is a standards-compliant Firefox engine, not Chromium. The Chrome-style user-agent helps with browser checks but cannot supply Chromium-only APIs, proprietary codecs, Chrome extensions, or bugs/behaviour specific to Blink/V8. Some sites may still require a Chromium-based browser. Validate important sites on real devices before claiming compatibility.
+GeckoView is a Firefox engine, not Chromium. The Chrome-style user-agent helps with browser checks but cannot supply Chromium-only APIs, proprietary codecs, Chrome extensions, or behaviour specific to Blink/V8. Some sites may still require a Chromium-based browser. Validate important sites on real devices before claiming compatibility.
 
 ## Upstream documentation
 
