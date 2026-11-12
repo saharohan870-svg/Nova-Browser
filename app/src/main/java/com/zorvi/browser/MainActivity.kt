@@ -208,7 +208,7 @@ class MainActivity : Activity() {
             Toast.makeText(this, "Open a webpage first", Toast.LENGTH_SHORT).show(); return
         }
         Toast.makeText(this, "Extracting page text…", Toast.LENGTH_SHORT).show()
-        tab.session.sessionPageExtractor.pageContent.then { content ->
+        tab.session.sessionPageExtractor.pageContent.then<Void> { content ->
             val excerpt = content.orEmpty().take(9000)
             runOnUiThread {
                 if (excerpt.isBlank()) Toast.makeText(this, "Could not extract readable page text", Toast.LENGTH_LONG).show()
@@ -261,7 +261,7 @@ class MainActivity : Activity() {
         if (!tab.url.startsWith("http://") && !tab.url.startsWith("https://")) {
             Toast.makeText(this, "Open an article first", Toast.LENGTH_SHORT).show(); return
         }
-        tab.session.sessionPageExtractor.pageContent.then { content ->
+        tab.session.sessionPageExtractor.pageContent.then<Void> { content ->
             runOnUiThread {
                 val article = content.orEmpty()
                 if (article.isBlank()) Toast.makeText(this, "No readable article text found", Toast.LENGTH_LONG).show()
@@ -286,7 +286,7 @@ class MainActivity : Activity() {
             translateCurrentPage(); return
         }
         Toast.makeText(this, "Extracting page text…", Toast.LENGTH_SHORT).show()
-        tab.session.sessionPageExtractor.pageContent.then { content ->
+        tab.session.sessionPageExtractor.pageContent.then<Void> { content ->
             val pageText = content.orEmpty().take(12000)
             if (pageText.isBlank()) {
                 runOnUiThread { Toast.makeText(this, "No readable text found", Toast.LENGTH_LONG).show() }
