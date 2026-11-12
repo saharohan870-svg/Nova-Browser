@@ -19,7 +19,7 @@ import java.util.Locale
 
 /** Main browser surface. Web pages are rendered by GeckoView, never Android WebView. */
 class MainActivity : Activity() {
-    private data class BrowserTab(val session: GeckoSession, val view: GeckoView, val isPrivate: Boolean, var title: String = "New tab")
+    private data class BrowserTab(val session: GeckoSession, val view: GeckoView, val isPrivate: Boolean, var title: String = "New tab", var group: String = "Default")
 
     private lateinit var root: LinearLayout
     private lateinit var address: EditText
@@ -92,6 +92,7 @@ class MainActivity : Activity() {
             setOnClickListener { showTabs() }
         }
         controls.addView(tabsLabel)
+        controls.addView(button("Group") { assignTabGroup() })
         controls.addView(button("Private") { togglePrivate() })
         controls.addView(button("☾") { toggleDark() })
         root.addView(controls)
@@ -147,7 +148,7 @@ class MainActivity : Activity() {
                 if (session === activeSession()) updateTabs()
             }
         }
-        tabs.add(BrowserTab(session, view, privateMode))
+        tabs.add(BrowserTab(session, view, privateMode, group = activeTab()?.group ?: "Default"))
         active = tabs.lastIndex
         activeCanGoBack = false
         root.addView(view, LinearLayout.LayoutParams(-1, 0, 1f))
@@ -204,6 +205,39 @@ class MainActivity : Activity() {
                 else { active = which; activeCanGoBack = false; showOnlyActive(); updateTabs() }
             }
             .setNegativeButton("Close current") { _, _ -> closeTab() }
+            .show()
+    }
+
+    private fun assignTabGroup() {
+        val tab = activeTab() ?: return
+        val existing = tabs.map { it.group }.distinct().toMutableList()
+        existing.add("＋ Create new group")
+        AlertDialog.Builder(this)
+            .setTitle("Move tab to group")
+            .setItems(existing.toTypedArray()) { _, which ->
+                if (which == existing.lastIndex) {
+                    val nameInput = EditText(this).apply {
+                        hint = "Group name"
+                        setSingleLine(true)
+                    }
+                    AlertDialog.Builder(this)
+                        .setTitle("Create tab group")
+                        .setView(nameInput)
+                        .setPositiveButton("Create") { _, _ ->
+                            val name = nameInput.text.toString().trim().take(24)
+                            if (name.isNotEmpty()) {
+                                tab.group = name
+                                updateTabs()
+                            }
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                } else {
+                    tab.group = existing[which]
+                    updateTabs()
+                }
+            }
+            .setNegativeButton("Cancel", null)
             .show()
     }
 
