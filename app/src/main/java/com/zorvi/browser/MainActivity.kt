@@ -19,7 +19,7 @@ import java.util.Locale
 
 /** Main browser surface. Web pages are rendered by GeckoView, never Android WebView. */
 class MainActivity : Activity() {
-    private data class BrowserTab(val session: GeckoSession, val view: GeckoView, val isPrivate: Boolean)
+    private data class BrowserTab(val session: GeckoSession, val view: GeckoView, val isPrivate: Boolean, var title: String = "New tab")
 
     private lateinit var root: LinearLayout
     private lateinit var address: EditText
@@ -29,6 +29,7 @@ class MainActivity : Activity() {
     private var active = 0
     private var privateMode = false
     private var dark = false
+    private var activeCanGoBack = false
     private val prefs by lazy { getSharedPreferences("zorvi", Context.MODE_PRIVATE) }
     private val engines = listOf("Google", "Bing", "DuckDuckGo", "Brave Search")
 
@@ -135,9 +136,20 @@ class MainActivity : Activity() {
                     saveHistory(url)
                 }
             }
+            override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) {
+                if (session === activeSession()) activeCanGoBack = canGoBack
+            }
         })
+        session.contentDelegate = object : GeckoSession.ContentDelegate {
+            override fun onTitleChange(session: GeckoSession, title: String) {
+                val tab = tabs.firstOrNull { it.session === session } ?: return
+                tab.title = title.ifBlank { "New tab" }
+                if (session === activeSession()) updateTabs()
+            }
+        }
         tabs.add(BrowserTab(session, view, privateMode))
         active = tabs.lastIndex
+        activeCanGoBack = false
         root.addView(view, LinearLayout.LayoutParams(-1, 0, 1f))
         showOnlyActive()
         updateTabs()
@@ -183,13 +195,13 @@ class MainActivity : Activity() {
     private fun showTabs() {
         val labels = tabs.mapIndexed { index, tab ->
             (index + 1).toString() + ". " + (if (tab.isPrivate) "[Private] " else "") +
-                (tab.session.toString().take(48))
+                tab.title.take(48)
         }.toMutableList()
         labels.add("＋ New tab")
         AlertDialog.Builder(this).setTitle("Zorvi tabs")
             .setItems(labels.toTypedArray()) { _, which ->
                 if (which == tabs.size) newTab("https://www.google.com")
-                else { active = which; showOnlyActive(); updateTabs() }
+                else { active = which; activeCanGoBack = false; showOnlyActive(); updateTabs() }
             }
             .setNegativeButton("Close current") { _, _ -> closeTab() }
             .show()
@@ -206,6 +218,7 @@ class MainActivity : Activity() {
         removed.session.close()
         removed.view.releaseSession()
         active = active.coerceAtMost(tabs.lastIndex)
+        activeCanGoBack = false
         showOnlyActive()
         updateTabs()
     }
@@ -275,17 +288,8 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Android")
     override fun onBackPressed() {
         val session = activeSession()
-        if (session != null) {
-            // GeckoSession.goBack() is asynchronous; use its navigation history
-            // to avoid consuming Android Back when the current page has no history.
-            session.navigationDelegate = object : GeckoSession.NavigationDelegate {
-                override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) {
-                    if (canGoBack) session.goBack() else super@MainActivity.onBackPressed()
-                }
-            }
-        } else {
-            super.onBackPressed()
-        }
+        if (session != null && activeCanGoBack) session.goBack()
+        else super.onBackPressed()
     }
 
     override fun onDestroy() {
