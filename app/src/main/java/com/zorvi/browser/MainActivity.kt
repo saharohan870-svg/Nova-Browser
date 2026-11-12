@@ -538,7 +538,8 @@ class MainActivity : Activity() {
         session.setNavigationDelegate(object : GeckoSession.NavigationDelegate {
             override fun onLoadRequest(session: GeckoSession, request: GeckoSession.NavigationDelegate.LoadRequest): GeckoResult<AllowOrDeny>? {
                 if (isExternalScheme(request.uri)) {
-                    openExternalUri(request.uri)
+                    // Only a direct user gesture may launch another Android app.
+                    if (request.hasUserGesture) openExternalUri(request.uri)
                     return GeckoResult.deny()
                 }
                 return if (isDomainBlocked(request.uri)) GeckoResult.deny() else null
