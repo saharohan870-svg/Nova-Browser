@@ -15,6 +15,16 @@ android {
         versionName = "0.4.0"
     }
 
+    // Ship an Android-phone APK without bundling desktop and other CPU architectures.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a")
+            isUniversalApk = false
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
