@@ -119,6 +119,7 @@ class MainActivity : Activity() {
         controls.addView(button("Home") { openHome() })
         controls.addView(button("Tools") { showAdvancedTools() })
         controls.addView(button("Shield") { showPrivacyControls() })
+        controls.addView(button("Permissions") { showPermissionDashboard() })
         controls.addView(button("Group") { manageGroups() })
         controls.addView(button("Downloads") { showDownloads() })
         controls.addView(button("PiP") { enterPip() })
@@ -230,6 +231,32 @@ class MainActivity : Activity() {
             Toast.makeText(this, "Open an article first", Toast.LENGTH_SHORT).show(); return
         }
         current()?.session?.loadUri("about:reader?url=" + URLEncoder.encode(url, "UTF-8"))
+    }
+
+    private fun showPermissionDashboard() {
+        val entries = prefs.all.filter { it.key.startsWith("site_permission_") }
+        if (entries.isEmpty()) {
+            AlertDialog.Builder(this).setTitle("Site permissions").setMessage("No remembered site permissions yet. You can choose Remember when a site requests access.")
+                .setPositiveButton("OK", null).show()
+            return
+        }
+        val labels = entries.map { entry ->
+            val parts = entry.key.removePrefix("site_permission_").split("_")
+            val site = parts.dropLast(1).joinToString("_")
+            val state = if (entry.value == GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW) "Allowed" else "Blocked"
+            site + " — " + state
+        }.toTypedArray()
+        AlertDialog.Builder(this).setTitle("Remembered site permissions")
+            .setItems(labels) { _, index ->
+                val key = entries[index].key
+                AlertDialog.Builder(this).setTitle(labels[index]).setMessage("Remove this saved decision? The site will ask again next time.")
+                    .setPositiveButton("Forget") { _, _ -> prefs.edit().remove(key).apply(); showPermissionDashboard() }
+                    .setNegativeButton("Keep", null).show()
+            }.setNeutralButton("Clear all") { _, _ ->
+                val edit = prefs.edit()
+                entries.forEach { edit.remove(it.key) }
+                edit.apply()
+            }.setNegativeButton("Close", null).show()
     }
 
     private fun showPrivacyControls() {
