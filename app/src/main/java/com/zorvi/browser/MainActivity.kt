@@ -174,13 +174,23 @@ class MainActivity : Activity() {
         }.show()
     }
 
+    private fun chooseAiProvider(prompt: String, title: String) {
+        val providers = arrayOf("Perplexity", "ChatGPT")
+        AlertDialog.Builder(this).setTitle(title).setItems(providers) { _, which ->
+            val encoded = URLEncoder.encode(prompt, "UTF-8")
+            val target = if (which == 0) "https://www.perplexity.ai/search?q=$encoded"
+                else "https://chatgpt.com/?q=$encoded"
+            newTab(target)
+        }.setNegativeButton("Cancel", null).show()
+    }
+
     private fun askAiAssistant() {
         val prompt = EditText(this).apply { hint = "Ask anything…" }
         AlertDialog.Builder(this).setTitle("Nova AI assistant")
-            .setMessage("Nova will open ChatGPT with your question.")
-            .setView(prompt).setPositiveButton("Ask") { _, _ ->
+            .setMessage("Choose Perplexity or ChatGPT after entering your question.")
+            .setView(prompt).setPositiveButton("Continue") { _, _ ->
                 val question = prompt.text.toString().trim()
-                if (question.isNotEmpty()) newTab("https://chatgpt.com/?q=" + URLEncoder.encode(question, "UTF-8"))
+                if (question.isNotEmpty()) chooseAiProvider(question, "Choose AI assistant")
             }.setNegativeButton("Cancel", null).show()
     }
 
@@ -190,7 +200,7 @@ class MainActivity : Activity() {
             Toast.makeText(this, "Open a webpage first", Toast.LENGTH_SHORT).show(); return
         }
         val prompt = "Please open and summarize this webpage. If you cannot access it, tell me: $url"
-        newTab("https://chatgpt.com/?q=" + URLEncoder.encode(prompt, "UTF-8"))
+        chooseAiProvider(prompt, "Summarize with")
     }
 
     private fun translateCurrentPage() {
