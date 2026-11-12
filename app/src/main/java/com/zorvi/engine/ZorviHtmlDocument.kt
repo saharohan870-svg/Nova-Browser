@@ -20,6 +20,7 @@ internal data class HtmlNode(
 internal data class HtmlDocument(val root: HtmlNode) {
     companion object {
         private const val MAX_SOURCE_CHARS = 2_000_000
+        private const val MAX_TREE_DEPTH = 256
         private val voidTags = setOf(
             "area", "base", "br", "col", "embed", "hr", "img", "input",
             "link", "meta", "param", "source", "track", "wbr"
@@ -135,7 +136,7 @@ internal data class HtmlDocument(val root: HtmlNode) {
                     continue
                 }
                 if (input.startsWith("<!", cursor) || input.startsWith("<?", cursor)) {
-                    val end = input.indexOf('>', cursor + 2)
+                    val end = findTagEnd(input, cursor + 2)
                     cursor = if (end < 0) input.length else end + 1
                     continue
                 }
@@ -182,15 +183,30 @@ internal data class HtmlDocument(val root: HtmlNode) {
                     // Title is retained in the head; the body switch occurs on </head>.
                 }
                 closeParagraphIfNeeded(name)
-                if (name == "li") closeOpen("li")
-                if (name == "dt" || name == "dd") { closeOpen("dt"); closeOpen("dd") }
-                if (name == "option") closeOpen("option")
+                when (name) {
+                    "li" -> closeOpen("li")
+                    "dt", "dd" -> { closeOpen("dt"); closeOpen("dd") }
+                    "option" -> closeOpen("option")
+                    "optgroup" -> { closeOpen("option"); closeOpen("optgroup") }
+                    "rp", "rt" -> { closeOpen("rp"); closeOpen("rt") }
+                    "tr" -> { closeOpen("td"); closeOpen("th"); closeOpen("tr") }
+                    "td", "th" -> { closeOpen("td"); closeOpen("th") }
+                    "thead", "tbody", "tfoot" -> {
+                        closeOpen("td"); closeOpen("th"); closeOpen("tr")
+                        closeOpen("thead"); closeOpen("tbody"); closeOpen("tfoot")
+                    }
+                    "caption", "colgroup" -> {
+                        closeOpen("td"); closeOpen("th"); closeOpen("tr")
+                        closeOpen("thead"); closeOpen("tbody"); closeOpen("tfoot")
+                        closeOpen(name)
+                    }
+                }
                 if (name in headingTags) headingTags.forEach(::closeOpen)
 
                 val node = HtmlNode(name, attributes = parseAttributes(trimmed, name.length))
                 current().children += node
                 val selfClosing = trimmed.endsWith("/")
-                if (name !in voidTags && !selfClosing) stack += node
+                if (name !in voidTags && !selfClosing && stack.size < MAX_TREE_DEPTH) stack += node
             }
 
             return HtmlDocument(document)
@@ -225,16 +241,27 @@ internal data class HtmlDocument(val root: HtmlNode) {
 
         private fun decodeEntities(value: String): String {
             val named = mapOf(
-                "amp" to "&", "lt" to "<", "gt" to ">", "quot" to "\"",
-                "apos" to "'", "nbsp" to "\u00A0", "copy" to "©", "reg" to "®",
-                "mdash" to "—", "ndash" to "–", "hellip" to "…"
+                "amp" to "&", "lt" to "<", "gt" to ">", "quot" to "\"", "apos" to "'",
+                "nbsp" to "\u00A0", "copy" to "©", "reg" to "®", "trade" to "™",
+                "mdash" to "—", "ndash" to "–", "hellip" to "…", "laquo" to "«",
+                "raquo" to "»", "lsquo" to "‘", "rsquo" to "’", "ldquo" to "“",
+                "rdquo" to "”", "bull" to "•", "middot" to "·", "times" to "×",
+                "divide" to "÷", "plusmn" to "±", "euro" to "€", "pound" to "£",
+                "yen" to "¥", "cent" to "¢", "deg" to "°", "para" to "¶",
+                "sect" to "§", "micro" to "µ", "acute" to "´", "aacute" to "á",
+                "eacute" to "é", "iacute" to "í", "oacute" to "ó", "uacute" to "ú",
+                "Aacute" to "Á", "Eacute" to "É", "uuml" to "ü", "Uuml" to "Ü",
+                "ntilde" to "ñ", "Ntilde" to "Ñ", "ccedil" to "ç", "Ccedil" to "Ç"
             )
-            return Regex("&(#x[0-9a-fA-F]+|#\\d+|[A-Za-z][A-Za-z0-9]+);?").replace(value) { match ->
-                val key = match.groupValues[1]
+            val legacyNoSemicolon = setOf("amp", "lt", "gt", "quot", "nbsp", "copy", "reg")
+            return Regex("&(#x[0-9a-fA-F]+;?|#\\d+;?|[A-Za-z][A-Za-z0-9]*;?)").replace(value) { match ->
+                val raw = match.groupValues[1]
+                val key = raw.removeSuffix(";")
                 when {
-                    key.startsWith("#x", true) -> key.drop(2).toIntOrNull(16)?.let(::codePoint) ?: match.value
-                    key.startsWith("#") -> key.drop(1).toIntOrNull()?.let(::codePoint) ?: match.value
-                    else -> named[key] ?: match.value
+                    key.startsWith("#x", true) -> key.drop(2).toIntOrNull(16)?.let(::codePoint) ?: "\uFFFD"
+                    key.startsWith("#") -> key.drop(1).toIntOrNull()?.let(::codePoint) ?: "\uFFFD"
+                    named.containsKey(key) && (raw.endsWith(";") || key in legacyNoSemicolon) -> named.getValue(key)
+                    else -> match.value
                 }
             }
         }
