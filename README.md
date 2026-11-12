@@ -17,9 +17,9 @@ An Android browser prototype with a Chrome-inspired interface, powered by Mozill
 - Quick links for Google, YouTube, GitHub, Instagram, Discord, WhatsApp Web and Microsoft 365
 - Dark browser toolbar theme
 - Custom home page and Home shortcut
-- AI assistant and page-summary handoff with a choice of Perplexity or ChatGPT
+- AI assistant with Perplexity/ChatGPT choice, native page-text extraction for AI summaries, reader mode with text/theme controls, and on-device translation for supported languages
 - Google Translate page handoff and Gecko reader-mode entry
-- Privacy controls for GeckoView tracking protection
+- Privacy controls for GeckoView tracking protection and a user-managed domain navigation blocklist
 - Local history/bookmark/tab-restore cleanup
 - Page-crash recovery actions and low-memory session handling
 - Close-other-tabs action
