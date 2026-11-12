@@ -8,7 +8,9 @@ on:
       - 'gradle/**'
       - '*.gradle*'
       - 'settings.gradle*'
-      - '.github/workflows/android.yml'\n      - 'scripts/**'\n      - 'docs/UPSTREAM_ENGINE_PIN.md'
+      - '.github/workflows/android.yml'
+      - 'scripts/**'
+      - 'docs/UPSTREAM_ENGINE_PIN.md'
   workflow_dispatch:
 
 permissions:
@@ -32,7 +34,9 @@ jobs:
           packages: platform-tools
       - name: Install required Android SDK packages
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
-      - name: Verify pinned Brave and Chromium upstream refs\n        run: python3 scripts/verify_upstream_pins.py\n      - name: Build and test debug APK
+      - name: Verify pinned Brave and Chromium upstream refs
+        run: python3 scripts/verify_upstream_pins.py
+      - name: Build and test debug APK
         run: gradle testDebugUnitTest assembleDebug --stacktrace
       - name: Check APK download size
         run: |
