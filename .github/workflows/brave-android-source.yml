@@ -118,10 +118,3 @@ jobs:
             cd "$GITHUB_WORKSPACE/engine-artifacts"
             sha256sum "$(basename "$APK")" | tee apk-sha256.txt
           )
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: zorvi-upstream-brave-arm64-debug
-          path: engine-artifacts/
-          if-no-files-found: error
-          retention-days: 7
