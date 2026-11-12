@@ -1,18 +1,25 @@
 package com.zorvi.browser
 
 import android.app.Activity
+import android.app.DownloadManager
+import android.app.PictureInPictureParams
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
+import android.os.Build
+import android.util.Rational
 import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.*
 import org.json.JSONArray
 import org.mozilla.geckoview.GeckoRuntime
+import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.GeckoSessionSettings
 import org.mozilla.geckoview.GeckoView
@@ -24,7 +31,7 @@ import java.util.Locale
  * Each tab owns one GeckoSession; private tabs use Gecko's private-mode session setting.
  */
 class MainActivity : Activity() {
-    private data class Tab(val session: GeckoSession, val view: GeckoView, var url: String = "", var title: String = "", val private: Boolean = false)
+    private data class Tab(val session: GeckoSession, val view: GeckoView, var url: String = "", var title: String = "", val private: Boolean = false, var group: String = "General")
     private lateinit var root: LinearLayout
     private lateinit var address: EditText
     private lateinit var tabsLabel: TextView
@@ -33,6 +40,12 @@ class MainActivity : Activity() {
     private var active = 0
     private var privateMode = false
     private var dark = false
+    private var fullScreen = false
+    private var pendingFilePrompt: GeckoSession.PromptDelegate.FilePrompt? = null
+    private var pendingFileResult: GeckoResult<GeckoSession.PromptDelegate.PromptResponse>? = null
+    private var pendingAndroidPermission: GeckoSession.PermissionDelegate.Callback? = null
+    private val requestFile = 4101
+    private val requestWebPermission = 4102
     private val prefs by lazy { getSharedPreferences("zorvi", Context.MODE_PRIVATE) }
     private val engines = listOf("Google", "Bing", "DuckDuckGo", "Brave Search")
     private val runtime: GeckoRuntime by lazy { getOrCreateRuntime() }
@@ -40,7 +53,8 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         buildUi()
-        newTab("https://www.google.com")
+        restoreTabs()
+        if (tabs.isEmpty()) newTab("https://www.google.com")
     }
 
     private fun buildUi() {
@@ -81,6 +95,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
+        controls.addView(button("＋") { newTab("https://www.google.com") })
         controls.addView(button("←") { current()?.session?.goBack() })
         controls.addView(button("→") { current()?.session?.goForward() })
         controls.addView(button("↻") { current()?.session?.reload() })
@@ -92,6 +107,9 @@ class MainActivity : Activity() {
             setOnClickListener { showTabs() }
         }
         controls.addView(tabsLabel)
+        controls.addView(button("Group") { manageGroups() })
+        controls.addView(button("Downloads") { showDownloads() })
+        controls.addView(button("PiP") { enterPip() })
         controls.addView(button("Zorvi") { openInZorvi() })
         controls.addView(button("Private") { togglePrivate() })
         controls.addView(button("☾") { dark = !dark; applyTheme() })
@@ -114,8 +132,14 @@ class MainActivity : Activity() {
             .build()
         val session = GeckoSession(settings)
         val view = GeckoView(this)
-        val tab = Tab(session, view, private = privateMode)
+        val tab = Tab(session, view, private = privateMode, group = if (privateMode) "Private" else (prefs.getString("active_group", "General") ?: "General"))
         session.setContentDelegate(object : GeckoSession.ContentDelegate {
+            override fun onExternalResponse(session: GeckoSession, response: org.mozilla.geckoview.WebResponse) {
+                runOnUiThread { queueDownload(response.uri, response.headers["content-disposition"], response.headers["content-type"]) }
+            }
+            override fun onFullScreen(session: GeckoSession, fullScreen: Boolean) {
+                runOnUiThread { setBrowserFullScreen(fullScreen) }
+            }
             override fun onTitleChange(session: GeckoSession, title: String?) {
                 tab.title = title.orEmpty()
                 if (current() === tab) updateTabs()
@@ -140,10 +164,49 @@ class MainActivity : Activity() {
                 if (!tab.private && (next.startsWith("https://", true) || next.startsWith("http://", true))) saveHistory(next)
             }
         })
+        session.setPromptDelegate(object : GeckoSession.PromptDelegate {
+            override fun onFilePrompt(session: GeckoSession, prompt: GeckoSession.PromptDelegate.FilePrompt): GeckoResult<GeckoSession.PromptDelegate.PromptResponse> {
+                val result = GeckoResult<GeckoSession.PromptDelegate.PromptResponse>()
+                pendingFilePrompt = prompt
+                pendingFileResult = result
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE)
+                    .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, prompt.type == GeckoSession.PromptDelegate.FilePrompt.Type.MULTIPLE)
+                startActivityForResult(intent, requestFile)
+                return result
+            }
+        })
+        session.setPermissionDelegate(object : GeckoSession.PermissionDelegate {
+            override fun onAndroidPermissionsRequest(session: GeckoSession, permissions: Array<String>?, callback: GeckoSession.PermissionDelegate.Callback) {
+                if (permissions.isNullOrEmpty()) { callback.reject(); return }
+                pendingAndroidPermission = callback
+                requestPermissions(permissions, requestWebPermission)
+            }
+            override fun onContentPermissionRequest(session: GeckoSession, perm: GeckoSession.PermissionDelegate.ContentPermission): GeckoResult<Int> {
+                val result = GeckoResult<Int>()
+                val host = runCatching { Uri.parse(tab.url).host }.getOrNull() ?: "this website"
+                runOnUiThread {
+                    AlertDialog.Builder(this@MainActivity).setTitle("Website permission")
+                        .setMessage("Allow " + host + " to access this permission?")
+                        .setPositiveButton("Allow") { _, _ -> result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW) }
+                        .setNegativeButton("Block") { _, _ -> result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY) }
+                        .setOnCancelListener { result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY) }.show()
+                }
+                return result
+            }
+            override fun onMediaPermissionRequest(session: GeckoSession, uri: String, video: Array<GeckoSession.PermissionDelegate.MediaSource>?, audio: Array<GeckoSession.PermissionDelegate.MediaSource>?, callback: GeckoSession.PermissionDelegate.MediaCallback) {
+                runOnUiThread {
+                    AlertDialog.Builder(this@MainActivity).setTitle("Camera / microphone")
+                        .setMessage("Allow this website to use the requested camera or microphone?")
+                        .setPositiveButton("Allow") { _, _ -> callback.grant(video?.firstOrNull(), audio?.firstOrNull()) }
+                        .setNegativeButton("Block") { _, _ -> callback.reject() }.show()
+                }
+            }
+        })
         session.open(runtime)
         view.setSession(session)
         tabs.add(tab)
         active = tabs.lastIndex
+        saveTabs()
         root.addView(view, LinearLayout.LayoutParams(-1, 0, 1f))
         showOnlyActive()
         updateTabs()
@@ -195,16 +258,140 @@ class MainActivity : Activity() {
         startActivity(Intent(this, ZorviPageActivity::class.java).putExtra(ZorviPageActivity.EXTRA_URL, target))
     }
 
-    private fun updateTabs() { tabsLabel.text = "Tabs ${tabs.size}" }
+    private fun updateTabs() { tabsLabel.text = "Tabs " + tabs.size + " · " + (current()?.group ?: "—") }
+
+    private fun createGroup() {
+        val input = EditText(this).apply { hint = "Group name" }
+        AlertDialog.Builder(this).setTitle("Create tab group").setView(input)
+            .setPositiveButton("Create") { _, _ ->
+                val name = input.text.toString().trim().take(30)
+                if (name.isNotEmpty()) {
+                    prefs.edit().putString("active_group", name).apply()
+                    newTab("https://www.google.com")
+                }
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun manageGroups() {
+        val groups = (tabs.filter { !it.private }.map { it.group } + "General").distinct().toTypedArray()
+        AlertDialog.Builder(this).setTitle("Tab groups").setItems(groups) { _, index ->
+            val name = groups[index]
+            prefs.edit().putString("active_group", name).apply()
+            val found = tabs.indexOfLast { !it.private && it.group == name }
+            if (found >= 0) { active = found; showOnlyActive(); updateTabs() } else newTab("https://www.google.com")
+        }.setPositiveButton("New group") { _, _ -> createGroup() }.show()
+    }
+
+    private fun saveTabs() {
+        if (!::root.isInitialized) return
+        val saved = JSONArray()
+        var savedActive = 0
+        tabs.forEachIndexed { index, tab ->
+            if (!tab.private) {
+                saved.put(org.json.JSONObject().put("url", tab.url).put("group", tab.group))
+                if (index <= active) savedActive = saved.length() - 1
+            }
+        }
+        prefs.edit().putString("open_tabs", saved.toString()).putInt("active_tab", savedActive).apply()
+    }
+
+    private fun restoreTabs() {
+        val saved = runCatching { JSONArray(prefs.getString("open_tabs", "[]")) }.getOrDefault(JSONArray())
+        for (i in 0 until saved.length()) {
+            val item = saved.optJSONObject(i) ?: continue
+            val url = item.optString("url")
+            if (!url.startsWith("https://") && !url.startsWith("http://")) continue
+            prefs.edit().putString("active_group", item.optString("group", "General")).apply()
+            newTab(url)
+        }
+        if (tabs.isNotEmpty()) {
+            active = prefs.getInt("active_tab", tabs.lastIndex).coerceIn(0, tabs.lastIndex)
+            showOnlyActive()
+            updateTabs()
+        }
+    }
+
+    private fun queueDownload(url: String, disposition: String?, mime: String?) {
+        if (!url.startsWith("https://") && !url.startsWith("http://")) return
+        val headerName = disposition?.substringAfter("filename=", "")?.trim('"')?.takeIf { it.isNotBlank() }
+        val rawName = headerName ?: Uri.parse(url).lastPathSegment ?: "download"
+        val name = rawName.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_").take(120).ifBlank { "download" }
+        runCatching {
+            val request = DownloadManager.Request(Uri.parse(url)).setTitle(name)
+                .setDescription("Downloading with Nova Browser")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name)
+            if (!mime.isNullOrBlank()) request.setMimeType(mime.substringBefore(';'))
+            (getSystemService(DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
+            Toast.makeText(this, "Download started: " + name, Toast.LENGTH_LONG).show()
+        }.onFailure { Toast.makeText(this, "Download failed: " + it.message, Toast.LENGTH_LONG).show() }
+    }
+
+    private fun showDownloads() {
+        try { startActivity(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)) }
+        catch (_: Exception) { Toast.makeText(this, "Open Downloads in your Files app", Toast.LENGTH_SHORT).show() }
+    }
+
+    private fun setBrowserFullScreen(enabled: Boolean) {
+        fullScreen = enabled
+        if (!::root.isInitialized) return
+        root.getChildAt(0)?.visibility = if (enabled) View.GONE else View.VISIBLE
+        root.getChildAt(1)?.visibility = if (enabled) View.GONE else View.VISIBLE
+        window.decorView.systemUiVisibility = if (enabled)
+            (View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
+        else View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+    }
+
+    private fun enterPip() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try { enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()) }
+            catch (_: Exception) { Toast.makeText(this, "Picture-in-picture unavailable", Toast.LENGTH_SHORT).show() }
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == requestFile) {
+            val prompt = pendingFilePrompt
+            val result = pendingFileResult
+            if (prompt != null && result != null) {
+                if (resultCode == RESULT_OK && data != null) {
+                    val uris = mutableListOf<Uri>()
+                    data.clipData?.let { clip -> for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri) }
+                    if (uris.isEmpty()) data.data?.let { uris.add(it) }
+                    if (uris.isNotEmpty()) result.complete(prompt.confirm(this, uris.toTypedArray()))
+                    else result.complete(prompt.dismiss())
+                } else result.complete(prompt.dismiss())
+            }
+            pendingFilePrompt = null
+            pendingFileResult = null
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == requestWebPermission) {
+            val callback = pendingAndroidPermission
+            if (callback != null) {
+                if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) callback.grant()
+                else callback.reject()
+            }
+            pendingAndroidPermission = null
+        }
+    }
 
     private fun showTabs() {
         val names = tabs.mapIndexed { i, tab ->
             "${i + 1}. ${tab.title.ifBlank { tab.url.ifBlank { "New tab" } }}${if (tab.private) " [Private]" else ""}"
         }.toMutableList()
         names.add("＋ New tab")
+        names.add("＋ New tab group")
         AlertDialog.Builder(this).setTitle("Nova tabs").setItems(names.toTypedArray()) { _, which ->
-            if (which == tabs.size) newTab("https://www.google.com")
-            else { active = which; showOnlyActive(); updateTabs() }
+            when (which) {
+                tabs.size -> newTab("https://www.google.com")
+                tabs.size + 1 -> createGroup()
+                else -> { active = which; showOnlyActive(); updateTabs() }
+            }
         }.setNegativeButton("Close current") { _, _ -> closeTab() }.show()
     }
 
@@ -216,6 +403,7 @@ class MainActivity : Activity() {
         removed.session.close()
         if (tabs.isEmpty()) newTab("https://www.google.com")
         else { active = active.coerceAtMost(tabs.lastIndex); showOnlyActive(); updateTabs() }
+        saveTabs()
     }
 
     private fun togglePrivate() {
@@ -266,7 +454,8 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Android")
     override fun onBackPressed() {
         val tab = current()
-        if (tab != null) tab.session.goBack() else super.onBackPressed()
+        if (fullScreen) setBrowserFullScreen(false)
+        else if (tab != null && tab.session.canGoBack) tab.session.goBack() else if (tabs.size > 1) closeTab() else super.onBackPressed()
     }
 
     override fun onResume() {
@@ -276,6 +465,7 @@ class MainActivity : Activity() {
 
     override fun onPause() {
         current()?.session?.setActive(false)
+        saveTabs()
         super.onPause()
     }
 
