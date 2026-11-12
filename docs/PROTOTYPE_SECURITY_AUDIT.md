@@ -16,9 +16,9 @@ This audit describes the current Android prototype only. It is not a security ce
 
 ### 1. Private mode is not isolated — release blocker
 
-The app uses Android's process-wide `CookieManager`. Private and regular WebViews therefore do not have separate cookie stores. The current implementation avoids saving private-tab history and disables third-party cookies for private WebViews, but that does not isolate first-party cookies or other WebView profile data.
+The app uses Android's process-wide `CookieManager`. Private and regular WebViews therefore do not have separate cookie stores. The earlier implementation avoided saving private-tab history but shared the process-wide cookie store.
 
-**Required before advertising private browsing:** implement and test genuinely separate WebView profiles using a supported AndroidX WebKit profile mechanism or a process/data-directory architecture. Until then, label the feature prominently as limited prototype mode and do not describe it as secure or isolated private browsing.
+**Implementation now committed, validation pending:** the prototype now uses AndroidX WebKit's named multi-profile API for private WebViews, checks the runtime MULTI_PROFILE feature before enabling the mode, and clears private-profile cookies and WebStorage on startup, app exit, and after the last private tab closes. Unsupported WebView providers fail closed. The profile cleanup API can complete some deletion asynchronously, and an abrupt OS process kill cannot guarantee immediate cleanup; a fresh app launch performs cleanup again. This is a meaningful isolation improvement, but it still needs device-level verification on supported and unsupported WebView versions before being called release-ready.
 
 ### 2. Request blocking is only a small host list
 
@@ -49,7 +49,7 @@ The current browser activity creates Android `WebView` instances. The app does n
 - [ ] Brave Android source checkout is synchronized and the exact Chromium DEPS revision is recorded.
 - [ ] Zorvi branding and product assets replace upstream Brave identity without altering upstream legal notices.
 - [ ] ARM64 build completes on a verified no-cost host with adequate resources.
-- [ ] Private browsing has real profile isolation and automated regression tests.
+- [ ] Private profile isolation and cleanup pass device-level tests on supported WebView versions; unsupported providers fail closed.
 - [ ] Ad/tracker protection has a maintained filter implementation and regression tests.
 - [ ] Tab groups, downloads, bookmarks, history, and search selection pass device tests.
 - [ ] Google/GitHub auth is deployed with PKCE, secure token handling, revocation, and account-linking tests.
