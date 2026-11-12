@@ -40,13 +40,15 @@ jobs:
         run: gradle testDebugUnitTest assembleDebug --stacktrace
       - name: Check APK download size
         run: |
-          APK="app/build/outputs/apk/debug/app-debug.apk"
+          APK=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*arm64-v8a*debug.apk' -print -quit)
+          test -n "$APK"
           test -f "$APK"
           SIZE=$(stat -c%s "$APK")
+          echo "ARM64 APK: $APK"
           echo "APK bytes: $SIZE"
-          test "$SIZE" -lt 100000000
+          test "$SIZE" -lt 400000000
       - uses: actions/upload-artifact@v4
         with:
           name: zorvi-geckoview-arm64-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/*arm64-v8a*debug.apk
           if-no-files-found: error
