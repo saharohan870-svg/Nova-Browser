@@ -356,7 +356,7 @@ class MainActivity : Activity() {
         val field = EditText(this).apply { hint = "ads.example.com"; isSingleLine = true }
         val existing = blockedDomains().sorted()
         AlertDialog.Builder(this).setTitle("Domain blocklist")
-            .setMessage("Blocks matching page and iframe navigations. GeckoView tracking protection also blocks known trackers. This is not a full network-level ad filter.")
+            .setMessage("Adds your own domain-level rules on top of Nova's EasyList and EasyPrivacy network filter subscriptions. These rules block matching page and iframe navigations.")
             .setView(field)
             .setPositiveButton("Add domain") { _, _ ->
                 val host = field.text.toString().trim().lowercase(Locale.ROOT).removePrefix("https://").removePrefix("http://").substringBefore("/").substringBefore(":")
@@ -405,7 +405,7 @@ class MainActivity : Activity() {
     private fun showPrivacyControls() {
         val enabled = prefs.getBoolean("tracking_protection", true)
         val message = "GeckoView tracking protection is " + (if (enabled) "enabled." else "disabled.") +
-            "\\n\\nThis applies to newly created tabs. It is not a complete standalone ad blocker."
+            "\\n\\nNova uses EasyList and EasyPrivacy filter subscriptions for network and cosmetic ad blocking. Lists refresh about once per day when online; previously saved lists remain active between updates."
         AlertDialog.Builder(this).setTitle("Privacy and protection").setMessage(message)
             .setPositiveButton(if (enabled) "Turn off" else "Turn on") { _, _ ->
                 prefs.edit().putBoolean("tracking_protection", !enabled).apply()
