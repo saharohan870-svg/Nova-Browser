@@ -248,6 +248,24 @@ internal data class HtmlDocument(
                 }
                 if (name in headingTags) headingTags.forEach(::closeOpen)
 
+                // The tree builder inserts missing table section and row containers.
+                if (name == "tr" && current().tag == "table") {
+                    val impliedBody = HtmlNode("tbody")
+                    current().children += impliedBody
+                    stack += impliedBody
+                } else if ((name == "td" || name == "th") && current().tag == "table") {
+                    val impliedBody = HtmlNode("tbody")
+                    current().children += impliedBody
+                    stack += impliedBody
+                    val impliedRow = HtmlNode("tr")
+                    current().children += impliedRow
+                    stack += impliedRow
+                } else if ((name == "td" || name == "th") && current().tag in setOf("tbody", "thead", "tfoot")) {
+                    val impliedRow = HtmlNode("tr")
+                    current().children += impliedRow
+                    stack += impliedRow
+                }
+
                 val node = HtmlNode(name, attributes = parseAttributes(trimmed, name.length))
                 current().children += node
                 // HTML ignores one initial LF (or CRLF) in preformatted text elements.
