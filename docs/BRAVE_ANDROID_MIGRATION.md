@@ -76,15 +76,19 @@ The selected design is **Option B**: the Brave/Chromium engine runs on-device; G
 
 The security, account-linking, Codespace lifecycle, privacy boundaries and implementation sequence are specified in [AUTH_AND_CODESPACES.md](AUTH_AND_CODESPACES.md). Production sign-in is blocked until provider applications and a secure backend are registered and configured. No OAuth secrets or GitHub tokens may be embedded in the APK.
 
-## Cloud build constraint
+## Free-only build strategy
 
-A normal lightweight GitHub-hosted CI runner is not assumed to have sufficient disk or memory for a full Chromium/Brave Android build. The cloud host must be a provisioned Linux machine or self-hosted runner with persistent SSD storage and sufficient RAM. The GitHub repository connection can create branches and source commits, but it does not itself provision or operate that large build machine. Do not claim a cloud build is running until such a runner is actually available and its job logs are visible.
+The project must not incur charges without explicit approval. The repository's standard GitHub-hosted runner can build the lightweight Android WebView interim app, run its tests and publish a clearly labelled debug APK artifact. It cannot be treated as a Brave/Chromium source-build machine: the full upstream checkout and Android build need substantially more persistent disk and memory than this runner provides.
+
+The existing `.github/workflows/android.yml` is therefore enabled on this migration branch and explicitly labels its artifact as an **interim WebView build**, not Brave. This gives us a free, testable Android shell while the real engine migration is prepared.
+
+Do not attempt to download or compile the full Brave/Chromium source on the standard runner, silently switch to a paid runner, or publish the interim APK as a Brave-powered browser. A true Brave APK still requires a suitable build host. Possible no-cost routes can be evaluated separately, but only a verified host with adequate resources and no billing requirement may be used.
 
 ## Current status
 
 - [x] Migration decision recorded.
 - [x] Dedicated migration branch created from the existing experimental-engine branch.
-- [ ] Provision cloud Linux build host.
+- [ ] Find and verify a genuinely no-cost Linux build host with sufficient persistent resources.
 - [ ] Pin upstream Brave/Chromium revisions.
 - [ ] Build unmodified upstream ARM64 Android APK.
 - [ ] Apply Zorvi branding.
