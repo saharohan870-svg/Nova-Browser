@@ -212,14 +212,15 @@ class MainActivity : Activity() {
         if (!file.exists()) { onResult("No offline GGUF model installed. Open Tools → Offline AI model to select one."); return }
         aiScope.launch {
             val answer = withContext(Dispatchers.IO) {
-                var model: Any? = null
                 try {
-                    model = Llama.loadModel(modelPath = file.absolutePath, config = LlamaConfig(contextSize = 2048, threads = 4))
-                    Llama.complete(model, prompt = question, systemPrompt = "You are Nova's offline assistant. Be accurate and concise.", maxTokens = 256).text
+                    val model = Llama.loadModel(modelPath = file.absolutePath, config = LlamaConfig(contextSize = 2048, threads = 4))
+                    try {
+                        Llama.complete(model, prompt = question, systemPrompt = "You are Nova's offline assistant. Be accurate and concise.", maxTokens = 256).text
+                    } finally {
+                        Llama.releaseModel(model)
+                    }
                 } catch (error: Exception) {
                     "Offline AI failed: " + (error.message ?: "unknown error")
-                } finally {
-                    if (model != null) runCatching { Llama.releaseModel(model) }
                 }
             }
             onResult(answer)
