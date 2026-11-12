@@ -11,10 +11,10 @@ Phase 4 validates the current Android browser build, exercises the Zorvi engine'
 | Android debug APK build | In progress | CI runs `assembleDebug` after unit tests and uploads the APK artifact. |
 | Build failure triage | In progress | Previous build exposed Kotlin generic inference failures in three GeckoResult continuations; explicit continuation type was added in commit `8b5614eb9c00bac51798b8fd792be47e182398bd`. Awaiting CI result. |
 | Zorvi engine unit coverage | Partial | URL, networking, security/storage, DOM, HTML, CSS, layout, graphics, accessibility, resource discovery and private-session tests exist. Passing status must be confirmed from the current commit's CI. |
-| Website compatibility (16 targets) | Not yet device-verified | Run the Phase 2 compatibility matrix on physical Android hardware; shortcuts alone do not count as compatibility evidence. |
+| Website compatibility (16 targets) | Test matrix prepared; device testing pending | Added per-site result table and regression checklist in `docs/SEVEN_SITE_COMPATIBILITY_TEST_PLAN.md`. All 16 remain Not run until tested on a physical Android device. |
 | Ad blocker validation | Not yet verified | Confirm extension registration, filter-list downloads, network blocking, exceptions and cosmetic filtering on-device. |
-| Performance, memory and crash tests | Pending | Measure cold start, page load, tab memory, background/low-memory behavior and repeated navigation on real devices. |
-| Security/privacy review | Pending | Review permissions, private sessions, storage isolation, navigation policy, downloads and site permission persistence. |
+| Downloads and tab groups | Implementation expanded; device tests pending | Nova download list now shows DownloadManager status/progress and supports remove/delete actions. Tab groups support switch, move current tab, rename and delete (tabs move to General). |\n| Performance, memory and crash tests | Pending | Measure cold start, page load, tab memory, background/low-memory behavior and repeated navigation on real devices. |
+| Security/privacy review | Partial | Private-tab downloads are blocked; cookie policy and website-data controls added; external app links require a user gesture. Full review and device verification remain pending. |
 | Release APK / GitHub Release | Pending | Release only after CI passes and artifact installation/smoke tests succeed. |
 
 ## Acceptance criteria
@@ -27,4 +27,4 @@ Phase 4 validates the current Android browser build, exercises the Zorvi engine'
 - Release notes identify the actual engine (GeckoView) and clearly label Zorvi renderer as experimental.
 
 ## Important limitations
-The app is GeckoView-based, not a Chromium build. The Zorvi renderer is experimental and does not yet replace GeckoView for general web browsing. Automated JVM tests cannot certify Android UI, media playback, site compatibility or real-device performance.
+The app is GeckoView-based, not a Chromium build. The Zorvi renderer is experimental and does not yet replace GeckoView for general web browsing. Automated JVM tests cannot certify Android UI, media playback, site compatibility or real-device performance.\n## Additional Phase 4 implementation commits\n- `779dd676` — richer download manager and tab-group management.\n- `9994769f` — explicit 16-site compatibility result matrix and device regression checklist.\n
