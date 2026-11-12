@@ -70,6 +70,12 @@ Zorvi Browser will move from the experimental in-repository renderer to a brande
 - Run Android compatibility, stability, performance and security checks.
 - Publish an APK only after release checks pass.
 
+## Sign-in and personal cloud integration
+
+The selected design is **Option B**: the Brave/Chromium engine runs on-device; Google and GitHub sign-in unlock Zorvi cloud features; the user's own Codespace is used only for explicitly requested cloud tasks (initially the AI assistant). Normal web traffic remains local and must not be routed through Codespaces.
+
+The security, account-linking, Codespace lifecycle, privacy boundaries and implementation sequence are specified in [AUTH_AND_CODESPACES.md](AUTH_AND_CODESPACES.md). Production sign-in is blocked until provider applications and a secure backend are registered and configured. No OAuth secrets or GitHub tokens may be embedded in the APK.
+
 ## Cloud build constraint
 
 A normal lightweight GitHub-hosted CI runner is not assumed to have sufficient disk or memory for a full Chromium/Brave Android build. The cloud host must be a provisioned Linux machine or self-hosted runner with persistent SSD storage and sufficient RAM. The GitHub repository connection can create branches and source commits, but it does not itself provision or operate that large build machine. Do not claim a cloud build is running until such a runner is actually available and its job logs are visible.
