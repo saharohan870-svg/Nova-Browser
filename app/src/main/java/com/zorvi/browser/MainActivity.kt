@@ -19,7 +19,7 @@ import java.util.Locale
 
 /** Main browser surface. Web pages are rendered by GeckoView, never Android WebView. */
 class MainActivity : Activity() {
-    private data class BrowserTab(val session: GeckoSession, val view: GeckoView, val isPrivate: Boolean, var title: String = "New tab", var group: String = "Default")
+    private data class BrowserTab(val session: GeckoSession, val view: GeckoView, val isPrivate: Boolean, var title: String = "New tab", var group: String = "Default", var canGoBack: Boolean = false)
 
     private lateinit var root: LinearLayout
     private lateinit var address: EditText
@@ -29,7 +29,6 @@ class MainActivity : Activity() {
     private var active = 0
     private var privateMode = false
     private var dark = false
-    private var activeCanGoBack = false
     private val prefs by lazy { getSharedPreferences("zorvi", Context.MODE_PRIVATE) }
     private val engines = listOf("Google", "Bing", "DuckDuckGo", "Brave Search")
 
@@ -138,7 +137,7 @@ class MainActivity : Activity() {
                 }
             }
             override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) {
-                if (session === activeSession()) activeCanGoBack = canGoBack
+                tabs.firstOrNull { it.session === session }?.canGoBack = canGoBack
             }
         })
         session.contentDelegate = object : GeckoSession.ContentDelegate {
@@ -150,7 +149,6 @@ class MainActivity : Activity() {
         }
         tabs.add(BrowserTab(session, view, privateMode, group = activeTab()?.group ?: "Default"))
         active = tabs.lastIndex
-        activeCanGoBack = false
         root.addView(view, LinearLayout.LayoutParams(-1, 0, 1f))
         showOnlyActive()
         updateTabs()
@@ -202,7 +200,7 @@ class MainActivity : Activity() {
         AlertDialog.Builder(this).setTitle("Zorvi tabs")
             .setItems(labels.toTypedArray()) { _, which ->
                 if (which == tabs.size) newTab("https://www.google.com")
-                else { active = which; activeCanGoBack = false; showOnlyActive(); updateTabs() }
+                else { active = which; showOnlyActive(); updateTabs() }
             }
             .setNegativeButton("Close current") { _, _ -> closeTab() }
             .show()
@@ -322,7 +320,7 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Android")
     override fun onBackPressed() {
         val session = activeSession()
-        if (session != null && activeCanGoBack) session.goBack()
+        if (session != null && activeTab()?.canGoBack == true) session.goBack()
         else super.onBackPressed()
     }
 
