@@ -38,3 +38,10 @@ The app is GeckoView-based, not a Chromium build. The Zorvi renderer is experime
 - Important outstanding privacy requirement: this does not yet route traffic through Tor or otherwise mask the public IP. GeckoView has no supported public proxy-configuration API; a real Tor route needs a separately integrated and verified routing layer. Do not describe Guest Mode as Tor-protected until that is implemented and tested.
 - Guest Mode and Private Mode currently both rely on GeckoView's private-session facility; separate isolated private profiles are not yet verified.
 - Android build and on-device lifecycle/data-cleletion tests are pending.
+
+## Network privacy features requested (2026-11-12)
+- Product direction confirmed: an included, Brave-like VPN service for normal browsing, plus Tor routing specifically for Guest Mode.
+- Architecture and security acceptance criteria are documented in `docs/NETWORK_PRIVACY_ARCHITECTURE.md`.
+- **Not implemented yet:** VPN tunnel, provider authentication/server infrastructure, Tor runtime, GeckoView traffic routing and leak protection.
+- A real included VPN cannot be activated from Android client code alone; a VPN provider or Nova-operated server fleet and protocol/SDK are required. Do not show a connected state until a real tunnel is verified.
+- Tor Guest Mode must fail closed (never silently use direct internet) if bootstrap or routing fails.
