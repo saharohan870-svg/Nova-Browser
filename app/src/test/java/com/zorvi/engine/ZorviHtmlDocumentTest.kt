@@ -119,6 +119,12 @@ class ZorviHtmlDocumentTest {
         assertEquals("Inner", document.textContent(document.findAll("td")[1]))
     }
 
+    @Test fun doesNotDecodeAmbiguousLegacyReferencesInsideAttributes() {
+        val document = HtmlDocument.parse("<a title=\"&copy=1 &copycat &copy;\">Text &copy</a>")
+        assertEquals("&copy=1 &copycat ©", document.findFirst("a")!!.attributes["title"])
+        assertEquals("Text ©", document.textContent(document.findFirst("a")!!))
+    }
+
     @Test fun decodesCommonNamedAndWindows1252NumericReferences() {
         val document = HtmlDocument.parse("<p>&euro; &mdash; &hellip; &#x80; &#128;</p>")
         assertEquals("€ — … € €", document.textContent(document.findFirst("p")!!))
