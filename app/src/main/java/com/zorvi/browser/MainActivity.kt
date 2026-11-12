@@ -963,6 +963,11 @@ class MainActivity : Activity() {
                         ?: throw IllegalStateException("Could not open Downloads output")
                     val complete = ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }
                     contentResolver.update(destination!!, complete, null, null)
+                    val direct = runCatching { JSONArray(prefs.getString("direct_downloads", "[]")) }.getOrDefault(JSONArray())
+                    direct.put(org.json.JSONObject().put("name", name).put("uri", destination.toString())
+                        .put("mime", mime?.substringBefore(';') ?: "application/octet-stream"))
+                    while (direct.length() > 100) direct.remove(0)
+                    prefs.edit().putString("direct_downloads", direct.toString()).apply()
                 } else {
                     val directory = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir
                     val file = File(directory, name)
@@ -982,6 +987,8 @@ class MainActivity : Activity() {
         val ids = runCatching { JSONArray(prefs.getString("download_ids", "[]")) }.getOrDefault(JSONArray())
         val entries = mutableListOf<Long>()
         val labels = mutableListOf<String>()
+        val direct = runCatching { JSONArray(prefs.getString("direct_downloads", "[]")) }.getOrDefault(JSONArray())
+        val directUris = mutableListOf<Uri>()
         val cursor = manager.query(DownloadManager.Query())
         cursor?.use {
             val idCol = it.getColumnIndex(DownloadManager.COLUMN_ID)
@@ -1009,6 +1016,14 @@ class MainActivity : Activity() {
                 }
             }
         }
+        for (i in 0 until direct.length()) {
+            val item = direct.optJSONObject(i) ?: continue
+            val uri = runCatching { Uri.parse(item.optString("uri")) }.getOrNull() ?: continue
+            if (uri.scheme == "content") {
+                directUris.add(uri)
+                labels.add(item.optString("name", "Downloaded file") + " — Complete")
+            }
+        }
         if (labels.isEmpty()) {
             AlertDialog.Builder(this).setTitle("Downloads").setMessage("No Nova-managed downloads found.")
                 .setPositiveButton("Open Android downloads") { _, _ ->
@@ -1017,10 +1032,38 @@ class MainActivity : Activity() {
             return
         }
         AlertDialog.Builder(this).setTitle("Downloads").setItems(labels.toTypedArray()) { _, which ->
+            if (which >= entries.size) {
+                val directIndex = which - entries.size
+                val uri = directUris[directIndex]
+                val item = (0 until direct.length()).mapNotNull { direct.optJSONObject(it) }
+                    .firstOrNull { it.optString("uri") == uri.toString() }
+                AlertDialog.Builder(this).setItems(arrayOf("Open file", "Delete file")) { _, action ->
+                    if (action == 0) {
+                        val mime = item?.optString("mime", "application/octet-stream") ?: "application/octet-stream"
+                        runCatching { startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)) }
+                            .onFailure { Toast.makeText(this, "No app can open this file", Toast.LENGTH_SHORT).show() }
+                    } else AlertDialog.Builder(this).setMessage("Delete this downloaded file?")
+                        .setPositiveButton("Delete") { _, _ ->
+                            contentResolver.delete(uri, null, null)
+                            val updated = JSONArray()
+                            for (i in 0 until direct.length()) {
+                                val old = direct.optJSONObject(i)
+                                if (old?.optString("uri") != uri.toString()) updated.put(old)
+                            }
+                            prefs.edit().putString("direct_downloads", updated.toString()).apply()
+                        }.setNegativeButton("Cancel", null).show()
+                }.show()
+                return@setItems
+            }
             val id = entries[which]
-            AlertDialog.Builder(this).setItems(arrayOf("Open Android downloads", "Remove from Nova list", "Delete downloaded file")) { _, action ->
+            AlertDialog.Builder(this).setItems(arrayOf("Open file", "Remove from Nova list", "Delete downloaded file")) { _, action ->
                 when (action) {
-                    0 -> runCatching { startActivity(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)) }
+                    0 -> {
+                        val uri = manager.getUriForDownloadedFile(id)
+                        val mime = manager.getMimeTypeForDownloadedFile(id) ?: "application/octet-stream"
+                        if (uri != null) runCatching { startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)) }
+                            .onFailure { Toast.makeText(this, "No app can open this file", Toast.LENGTH_SHORT).show() }
+                    }
                     1 -> {
                         val updated = JSONArray()
                         for (i in 0 until ids.length()) if (ids.optLong(i) != id) updated.put(ids.optLong(i))
