@@ -641,7 +641,7 @@ class MainActivity : Activity() {
                 val result = GeckoResult<Int>()
                 val host = runCatching { Uri.parse(perm.uri).host }.getOrNull() ?: "this website"
                 val permissionKey = "site_permission_" + host + "_" + perm.permission
-                val remembered = prefs.getInt(permissionKey, -1)
+                val remembered = if (tab.guest) -1 else prefs.getInt(permissionKey, -1)
                 if (remembered == GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW || remembered == GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY) {
                     result.complete(remembered)
                     return result
@@ -658,7 +658,7 @@ class MainActivity : Activity() {
                         .setView(content)
                         .setPositiveButton("Allow") { _, _ ->
                             val value = GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW
-                            if (remember.isChecked) prefs.edit().putInt(permissionKey, value).apply()
+                            if (remember.isChecked && !tab.guest) prefs.edit().putInt(permissionKey, value).apply()
                             result.complete(value)
                         }
                         .setNegativeButton("Block") { _, _ ->
@@ -1253,6 +1253,10 @@ class MainActivity : Activity() {
     }
 
     private fun bookmark() {
+        if (current()?.guest == true) {
+            Toast.makeText(this, "Bookmarks are disabled in Guest Mode.", Toast.LENGTH_SHORT).show()
+            return
+        }
         val url = current()?.url ?: return
         if (!url.startsWith("https://") && !url.startsWith("http://")) return
         val list = JSONArray(prefs.getString("bookmarks", "[]"))
