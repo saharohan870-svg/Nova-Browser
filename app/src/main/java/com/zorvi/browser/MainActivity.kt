@@ -161,14 +161,15 @@ class MainActivity : Activity() {
     }
 
     private fun showAdvancedTools() {
-        val actions = arrayOf("Ask AI assistant", "Summarize current page with AI", "Translate current page", "Reader view", "Customize home page")
+        val actions = arrayOf("Ask AI assistant", "Summarize current page with AI", "Translate current page", "Translation language", "Reader view", "Customize home page")
         AlertDialog.Builder(this).setTitle("Nova tools").setItems(actions) { _, which ->
             when (which) {
                 0 -> askAiAssistant()
                 1 -> summarizeCurrentPage()
                 2 -> translateCurrentPage()
-                3 -> openReaderView()
-                4 -> customizeHomePage()
+                3 -> chooseTranslationLanguage()
+                4 -> openReaderView()
+                5 -> customizeHomePage()
             }
         }.show()
     }
@@ -199,6 +200,18 @@ class MainActivity : Activity() {
         }
         val language = prefs.getString("translation_language", "en") ?: "en"
         current()?.session?.loadUri("https://translate.google.com/translate?sl=auto&tl=" + language + "&u=" + URLEncoder.encode(url, "UTF-8"))
+    }
+
+    private fun chooseTranslationLanguage() {
+        val codes = arrayOf("en", "hi", "as", "bn", "fr", "de", "es", "ja", "zh-CN")
+        val labels = arrayOf("English", "Hindi", "Assamese", "Bengali", "French", "German", "Spanish", "Japanese", "Chinese")
+        val selected = codes.indexOf(prefs.getString("translation_language", "en")).coerceAtLeast(0)
+        AlertDialog.Builder(this).setTitle("Translate pages into")
+            .setSingleChoiceItems(labels, selected) { dialog, which ->
+                prefs.edit().putString("translation_language", codes[which]).apply()
+                dialog.dismiss()
+                Toast.makeText(this, "Translation language: " + labels[which], Toast.LENGTH_SHORT).show()
+            }.setNegativeButton("Cancel", null).show()
     }
 
     private fun openReaderView() {
@@ -601,11 +614,13 @@ class MainActivity : Activity() {
         names.add("＋ New tab")
         names.add("＋ New tab group")
         names.add("Close other tabs")
+        names.add("Duplicate current tab")
         AlertDialog.Builder(this).setTitle("Nova tabs").setItems(names.toTypedArray()) { _, which ->
             when (which) {
                 tabs.size -> newTab(homePage())
                 tabs.size + 1 -> createGroup()
                 tabs.size + 2 -> closeOtherTabs()
+                tabs.size + 3 -> current()?.url?.takeIf { it.startsWith("http") }?.let { newTab(it) }
                 else -> { active = which; showOnlyActive(); updateTabs() }
             }
         }.setNegativeButton("Close current") { _, _ -> closeTab() }.show()
