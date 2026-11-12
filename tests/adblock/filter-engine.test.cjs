@@ -20,12 +20,12 @@ test("respects resource type options",()=>{
 });
 test("exception rules override ordinary block rules",()=>{
  const c=Engine.compile(["||ads.example^$script","@@||ads.example/allowed^$script"]);
- assert.equal(Engine.decide(c,req("https://ads.example/allowed.js"),"publisher.com"),false);
+ assert.equal(Engine.decide(c,req("https://ads.example/allowed/abc"),"publisher.com"),false);
  assert.equal(Engine.decide(c,req("https://ads.example/other.js"),"publisher.com"),true);
 });
 test("important block rules override exception rules",()=>{
  const c=Engine.compile(["||ads.example/important^$script,important","@@||ads.example/important^$script"]);
- assert.equal(Engine.decide(c,req("https://ads.example/important.js"),"publisher.com"),true);
+ assert.equal(Engine.decide(c,req("https://ads.example/important/abc"),"publisher.com"),true);
 });
 test("domain options limit a rule to matching first-party domains",()=>{
  const c=Engine.compile(["||ads.example^$script,domain=publisher.com"]);
