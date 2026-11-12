@@ -28,9 +28,8 @@ android {
 }
 
 dependencies {
-    implementation("androidx.webkit:webkit:1.15.0")
-    // Standalone QuickJS runtime; not Chromium/V8 or Android System WebView.
-    implementation("io.github.dokar3:quickjs-kt-android:1.0.15")
+    // Mozilla GeckoView: bundled Gecko/SpiderMonkey engine, independent of Android System WebView.
+    implementation("org.mozilla.geckoview:geckoview:159.0.20261102144711")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     testImplementation("junit:junit:4.13.2")
 }
