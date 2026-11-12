@@ -36,7 +36,7 @@ import java.util.Locale
  * Each tab owns one GeckoSession; private tabs use Gecko's private-mode session setting.
  */
 class MainActivity : Activity() {
-    private data class Tab(val session: GeckoSession, val view: GeckoView, var url: String = "", var title: String = "", val private: Boolean = false, var group: String = "General", var serializedState: String? = null, var canGoBack: Boolean = false, var canGoForward: Boolean = false)
+    private data class Tab(val session: GeckoSession, val view: GeckoView, var url: String = "", var title: String = "", val private: Boolean = false, var group: String = "General", var serializedState: String? = null, var canGoBack: Boolean = false, var canGoForward: Boolean = false, var pinned: Boolean = false)
     private lateinit var root: LinearLayout
     private lateinit var address: EditText
     private lateinit var tabsLabel: TextView
@@ -462,7 +462,44 @@ class MainActivity : Activity() {
         startActivity(Intent(this, ZorviPageActivity::class.java).putExtra(ZorviPageActivity.EXTRA_URL, target))
     }
 
-    private fun updateTabs() { tabsLabel.text = "Tabs " + tabs.size + " · " + (current()?.group ?: "—") }
+    private fun updateTabs() {
+        val pinnedCount = tabs.count { it.pinned }
+        tabsLabel.text = "Tabs " + tabs.size + (if (pinnedCount > 0) " · Pinned " + pinnedCount else "") + " · " + (current()?.group ?: "—")
+    }
+
+    private fun searchTabs() {
+        val field = EditText(this).apply { hint = "Search tabs by title, URL or group" }
+        AlertDialog.Builder(this).setTitle("Search tabs").setView(field)
+            .setPositiveButton("Search") { _, _ ->
+                val query = field.text.toString().trim()
+                val matches = tabs.indices.filter { i ->
+                    val tab = tabs[i]
+                    query.isBlank() || tab.title.contains(query, true) || tab.url.contains(query, true) || tab.group.contains(query, true)
+                }
+                if (matches.isEmpty()) Toast.makeText(this, "No matching tabs", Toast.LENGTH_SHORT).show()
+                else {
+                    val labels = matches.map { i -> (i + 1).toString() + ". " + tabs[i].title.ifBlank { tabs[i].url } }.toTypedArray()
+                    AlertDialog.Builder(this).setTitle("Matching tabs").setItems(labels) { _, which ->
+                        active = matches[which]; showOnlyActive(); updateTabs()
+                    }.show()
+                }
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun showRecentlyClosed() {
+        val closed = runCatching { JSONArray(prefs.getString("recently_closed", "[]")) }.getOrDefault(JSONArray())
+        val urls = (0 until closed.length()).map { closed.optString(it) }.filter { it.startsWith("http://") || it.startsWith("https://") }.reversed()
+        if (urls.isEmpty()) { Toast.makeText(this, "No recently closed tabs", Toast.LENGTH_SHORT).show(); return }
+        AlertDialog.Builder(this).setTitle("Recently closed")
+            .setItems(urls.toTypedArray()) { _, which -> newTab(urls[which]) }
+            .setNegativeButton("Close", null).show()
+    }
+
+    private fun togglePinned(tab: Tab) {
+        tab.pinned = !tab.pinned
+        saveTabs(); updateTabs()
+        Toast.makeText(this, if (tab.pinned) "Tab pinned" else "Tab unpinned", Toast.LENGTH_SHORT).show()
+    }
 
     private fun createGroup() {
         val input = EditText(this).apply { hint = "Group name" }
@@ -492,7 +529,7 @@ class MainActivity : Activity() {
         var savedActive = 0
         tabs.forEachIndexed { index, tab ->
             if (!tab.private) {
-                val item = org.json.JSONObject().put("url", tab.url).put("group", tab.group)
+                val item = org.json.JSONObject().put("url", tab.url).put("group", tab.group).put("pinned", tab.pinned)
                 tab.serializedState?.let { item.put("state", it) }
                 saved.put(item)
                 if (index <= active) savedActive = saved.length() - 1
@@ -508,7 +545,7 @@ class MainActivity : Activity() {
             val url = item.optString("url")
             if (!url.startsWith("https://") && !url.startsWith("http://")) continue
             prefs.edit().putString("active_group", item.optString("group", "General")).apply()
-            newTab(url, item.optString("state").takeIf { it.isNotBlank() })
+            newTab(url, item.optString("state").takeIf { it.isNotBlank() }).also { tabs.lastOrNull()?.pinned = item.optBoolean("pinned", false) }
         }
         if (tabs.isNotEmpty()) {
             active = prefs.getInt("active_tab", tabs.lastIndex).coerceIn(0, tabs.lastIndex)
@@ -625,13 +662,19 @@ class MainActivity : Activity() {
         names.add("＋ New tab group")
         names.add("Close other tabs")
         names.add("Duplicate current tab")
+        names.add(if (current()?.pinned == true) "Unpin current tab" else "Pin current tab")
+        names.add("Search tabs")
+        names.add("Recently closed")
         AlertDialog.Builder(this).setTitle("Nova tabs").setItems(names.toTypedArray()) { _, which ->
             when (which) {
+                in 0 until tabs.size -> { active = which; showOnlyActive(); updateTabs() }
                 tabs.size -> newTab(homePage())
                 tabs.size + 1 -> createGroup()
                 tabs.size + 2 -> closeOtherTabs()
                 tabs.size + 3 -> current()?.url?.takeIf { it.startsWith("http") }?.let { newTab(it) }
-                else -> { active = which; showOnlyActive(); updateTabs() }
+                tabs.size + 4 -> current()?.let { togglePinned(it) }
+                tabs.size + 5 -> searchTabs()
+                tabs.size + 6 -> showRecentlyClosed()
             }
         }.setNegativeButton("Close current") { _, _ -> closeTab() }.show()
     }
@@ -651,6 +694,15 @@ class MainActivity : Activity() {
 
     private fun closeTab() {
         val removed = current() ?: return
+        if (!removed.private && (removed.url.startsWith("https://") || removed.url.startsWith("http://"))) {
+            val recently = runCatching { JSONArray(prefs.getString("recently_closed", "[]")) }.getOrDefault(JSONArray())
+            val updated = JSONArray().put(removed.url)
+            for (i in 0 until recently.length()) {
+                val old = recently.optString(i)
+                if (old != removed.url && updated.length() < 20) updated.put(old)
+            }
+            prefs.edit().putString("recently_closed", updated.toString()).apply()
+        }
         tabs.removeAt(active)
         removed.session.setActive(false)
         removed.view.releaseSession()
