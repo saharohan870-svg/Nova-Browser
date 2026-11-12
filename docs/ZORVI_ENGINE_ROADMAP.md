@@ -4,7 +4,7 @@
 
 Build an independent, standards-oriented browser engine for Android, with a modular architecture and a long-term capability target comparable to modern browser engines such as Chromium's Blink, Firefox's Gecko, and Safari's WebKit.
 
-This is a capability target, not a claim that the current prototype is close to those engines. The current implementation is an early renderer prototype: limited HTML parsing, basic CSS rules, a small DOM bridge, and an embedded QuickJS runtime. The main browser screen still uses Android System WebView. Keep that distinction explicit until the independent engine is integrated and passes release gates.
+This is a capability target, not a claim that the current prototype is close to those engines. The current implementation is an early renderer prototype: limited HTML parsing, basic CSS rules, a small DOM bridge, and an embedded QuickJS runtime. The main browser shell currently uses Mozilla GeckoView; the independent Zorvi renderer is exposed only through a separately labelled experimental page path. Keep that distinction explicit until the independent engine is integrated and passes release gates.
 
 A modern engine is a multi-year engineering effort for a small team, and potentially much longer for a solo project. Do not promise feature parity or set calendar dates before measuring the work.
 
@@ -359,7 +359,7 @@ An explicit experimental Zorvi page path is now present in the Android browser s
 
 - The main browser toolbar has an **Zorvi Engine** action that opens the current address in a dedicated page Activity.
 - The dedicated page host provides address/search input, Go, reload, back navigation, page title, and a visible “Zorvi Engine · Experimental renderer” label.
-- This Activity creates and hosts `ZorviEngineView` directly and does not instantiate Android WebView. The existing WebView-backed shell remains a separate compatibility path and is not misrepresented as Zorvi.
+- This Activity creates and hosts `ZorviEngineView` directly and does not instantiate Android WebView. The existing GeckoView-backed shell remains the normal compatibility path and is not misrepresented as the independent Zorvi renderer.
 - Zorvi page navigation now uses the bounded Phase 8 HTTP client, platform TLS validation, response-size limits, and HTML content-type checks.
 - A navigation generation token prevents stale responses from replacing a newer page; the active network call is cancelled when navigating again or detaching the renderer.
 - Basic touch-drag scrolling is enabled in the engine view.
