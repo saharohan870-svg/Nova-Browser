@@ -1,16 +1,6 @@
 name: Zorvi Android Interim APK (WebView)
 
 on:
-  push:
-    branches: [ main, chromium-engine-migration, zorvi-brave-migration ]
-    paths:
-      - 'app/**'
-      - 'gradle/**'
-      - '*.gradle*'
-      - 'settings.gradle*'
-      - '.github/workflows/android.yml'
-      - 'scripts/**'
-      - 'docs/UPSTREAM_ENGINE_PIN.md'
   workflow_dispatch:
 
 permissions:
