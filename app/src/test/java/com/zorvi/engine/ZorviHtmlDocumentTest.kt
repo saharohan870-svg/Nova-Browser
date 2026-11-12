@@ -33,6 +33,14 @@ class ZorviHtmlDocumentTest {
         assertEquals("After", document.textContent(body.children.last()))
     }
 
+    @Test fun ignoresSelfClosingSlashOnNonVoidHtmlElements() {
+        val document = HtmlDocument.parse("<div/>inside<span/>nested</span>end</div><p>After</p>")
+        val div = document.findFirst("div")!!
+        assertEquals("inside", document.textContent(div.children.first { it.tag == "#text" }))
+        assertEquals("nested", document.textContent(div.children.first { it.tag == "span" }))
+        assertEquals("After", document.textContent(document.findFirst("p")!!))
+    }
+
     @Test fun handlesCommentsVoidElementsAndMalformedClosingTags() {
         val document = HtmlDocument.parse("<p>One<br>Two<!-- hidden --><img src=x></p></oops>")
         val paragraph = document.findFirst("p")
