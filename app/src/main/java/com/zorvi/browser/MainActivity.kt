@@ -31,7 +31,7 @@ import java.util.Locale
  * Each tab owns one GeckoSession; private tabs use Gecko's private-mode session setting.
  */
 class MainActivity : Activity() {
-    private data class Tab(val session: GeckoSession, val view: GeckoView, var url: String = "", var title: String = "", val private: Boolean = false, var group: String = "General")
+    private data class Tab(val session: GeckoSession, val view: GeckoView, var url: String = "", var title: String = "", val private: Boolean = false, var group: String = "General", var serializedState: String? = null)
     private lateinit var root: LinearLayout
     private lateinit var address: EditText
     private lateinit var tabsLabel: TextView
@@ -125,7 +125,7 @@ class MainActivity : Activity() {
 
     private fun current(): Tab? = tabs.getOrNull(active)
 
-    private fun newTab(url: String = "about:blank") {
+    private fun newTab(url: String = "about:blank", restoredState: String? = null) {
         val settings = GeckoSessionSettings.Builder()
             .usePrivateMode(privateMode)
             .useTrackingProtection(true)
@@ -208,7 +208,18 @@ class MainActivity : Activity() {
                 }
             }
         })
+        session.setProgressDelegate(object : GeckoSession.ProgressDelegate {
+            override fun onSessionStateChange(session: GeckoSession, sessionState: GeckoSession.SessionState) {
+                tab.serializedState = sessionState.toString()
+                if (!tab.private) saveTabs()
+            }
+        })
         session.open(runtime)
+        if (!restoredState.isNullOrBlank()) {
+            runCatching { GeckoSession.SessionState.fromString(restoredState) }.getOrNull()?.let { session.restoreState(it) }
+        } else if (url != "about:blank") {
+            session.loadUri(url)
+        }
         view.setSession(session)
         tabs.add(tab)
         active = tabs.lastIndex
@@ -216,7 +227,6 @@ class MainActivity : Activity() {
         root.addView(view, LinearLayout.LayoutParams(-1, 0, 1f))
         showOnlyActive()
         updateTabs()
-        if (url != "about:blank") session.loadUri(url)
     }
 
     private fun showOnlyActive() {
@@ -294,7 +304,9 @@ class MainActivity : Activity() {
         var savedActive = 0
         tabs.forEachIndexed { index, tab ->
             if (!tab.private) {
-                saved.put(org.json.JSONObject().put("url", tab.url).put("group", tab.group))
+                val item = org.json.JSONObject().put("url", tab.url).put("group", tab.group)
+                tab.serializedState?.let { item.put("state", it) }
+                saved.put(item)
                 if (index <= active) savedActive = saved.length() - 1
             }
         }
@@ -308,7 +320,7 @@ class MainActivity : Activity() {
             val url = item.optString("url")
             if (!url.startsWith("https://") && !url.startsWith("http://")) continue
             prefs.edit().putString("active_group", item.optString("group", "General")).apply()
-            newTab(url)
+            newTab(url, item.optString("state").takeIf { it.isNotBlank() })
         }
         if (tabs.isNotEmpty()) {
             active = prefs.getInt("active_tab", tabs.lastIndex).coerceIn(0, tabs.lastIndex)
