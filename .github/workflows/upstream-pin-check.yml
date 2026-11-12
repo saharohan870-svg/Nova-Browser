@@ -1,0 +1,31 @@
+name: Upstream engine pin check
+
+on:
+  push:
+    branches:
+      - zorvi-brave-migration
+    paths:
+      - "scripts/verify_upstream_pins.py"
+      - "docs/UPSTREAM_ENGINE_PIN.md"
+      - ".github/workflows/brave-android-source.yml"
+      - ".github/workflows/upstream-pin-check.yml"
+  pull_request:
+    paths:
+      - "scripts/verify_upstream_pins.py"
+      - "docs/UPSTREAM_ENGINE_PIN.md"
+      - ".github/workflows/brave-android-source.yml"
+      - ".github/workflows/upstream-pin-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-pinned-upstream:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify immutable Brave and Chromium release refs
+        run: python3 scripts/verify_upstream_pins.py
