@@ -18,11 +18,11 @@ Status: implementation in progress; not build-verified or device-tested.
 
 ## Not yet implemented / incomplete
 
-- A full ad-filter engine and cosmetic filtering. The current privacy protection is GeckoView tracking protection; it is not a complete ad blocker.
+- Full network-level ad filtering, cosmetic element hiding, and maintained filter-list updates. Nova has GeckoView tracking protection plus a user-managed domain blocklist for top-level and iframe navigation; this is not equivalent to a full ad blocker.
 - Complete security dashboard covering certificates, cookies, site storage and all permission types. The new dashboard currently manages only remembered Gecko content-permission decisions.
-- Native in-browser AI that reads page content without handing the URL to an external AI website. GeckoView does not expose arbitrary page JavaScript evaluation to embedders; this needs a built-in WebExtension or a separate content-extraction architecture and an AI provider/model.
-- Offline translation. The online translation language picker is implemented; offline translation needs downloadable language models.
-- Reader-mode polish and in-reader font, theme and spacing controls.
+- Native on-device AI inference remains incomplete. Nova now extracts readable page text with GeckoView's PageExtraction API and passes a capped excerpt to the selected Perplexity or ChatGPT website for summarization. Page text is shared with that selected provider.
+- Offline translation is implemented for Google ML Kit-supported language pairs after their models are downloaded once. Assamese falls back to online translation because the on-device model does not support it. Device testing and language-pair coverage remain.
+- Reader view now extracts article text into a clean reading dialog with adjustable font size and light/dark themes.
 - Full crash/session restoration validation and performance benchmarking.
 - More advanced tab actions beyond pinning, tab search and recently closed tabs.
 
@@ -39,3 +39,13 @@ Status: implementation in progress; not build-verified or device-tested.
 ## Final verification still required
 
 Build the APK, run unit/instrumentation tests, verify the crash and memory paths, and test all features on a physical Android device. Phase 2's 16-site compatibility matrix remains part of final verification.
+
+
+## Latest additions
+
+- GeckoView upgraded to 149 to access its experimental page extraction API.
+- AI page summary now extracts readable text from the active page (up to 9,000 characters) before handing it to the user-selected AI website. The excerpt is shared with that provider.
+- Reader view displays extracted article text with persistent font-size and light/dark controls.
+- On-device translation uses Google ML Kit language identification and downloadable translation models; model download requires internet once per language pair. Assamese falls back to online translation.
+- User-maintained domain blocklist blocks matching top-level and subframe navigation requests. It does not intercept every network resource or hide ad elements.
+- Build and real-device validation are still required after the GeckoView and ML Kit upgrades.
