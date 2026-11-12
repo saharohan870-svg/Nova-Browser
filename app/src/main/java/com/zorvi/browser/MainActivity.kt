@@ -263,7 +263,12 @@ class MainActivity : Activity() {
             val excerpt = content.orEmpty().take(9000)
             runOnUiThread {
                 if (excerpt.isBlank()) Toast.makeText(this, "Could not extract readable page text", Toast.LENGTH_LONG).show()
-                else chooseAiProvider("Summarize this page using the extracted content.\nURL: $url\n\nPAGE CONTENT:\n$excerpt", "Summarize with")
+                else {
+                    val prompt = "Summarize this webpage. URL: $url\n\n" + excerpt
+                    if (modelFile().exists()) askOfflineModel(prompt) { answer ->
+                        AlertDialog.Builder(this).setTitle("Offline page summary").setMessage(answer).setPositiveButton("Done", null).show()
+                    } else chooseAiProvider(prompt, "Summarize with")
+                }
             }
             null
         }.exceptionally { error ->
