@@ -347,6 +347,33 @@ class MainActivity : Activity() {
 
     private fun blockedDomains(): Set<String> = prefs.getStringSet("blocked_domains", emptySet())?.toSet() ?: emptySet()
 
+    private fun isExternalScheme(raw: String): Boolean {
+        val scheme = runCatching { Uri.parse(raw).scheme?.lowercase(Locale.ROOT) }.getOrNull() ?: return false
+        return scheme in setOf("mailto", "tel", "sms", "smsto", "mms", "mmsto", "geo", "market", "intent")
+    }
+
+    private fun openExternalUri(raw: String) {
+        try {
+            val scheme = Uri.parse(raw).scheme?.lowercase(Locale.ROOT)
+            val intent = when (scheme) {
+                "tel" -> Intent(Intent.ACTION_DIAL, Uri.parse(raw))
+                "mailto", "sms", "smsto", "mms", "mmsto" -> Intent(Intent.ACTION_SENDTO, Uri.parse(raw))
+                "geo", "market" -> Intent(Intent.ACTION_VIEW, Uri.parse(raw))
+                "intent" -> Intent.parseUri(raw, Intent.URI_INTENT_SCHEME).apply {
+                    component = null
+                    selector = null
+                    addCategory(Intent.CATEGORY_BROWSABLE)
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                else -> return
+            }
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+        } catch (_: Exception) {
+            Toast.makeText(this, "No installed app can open this link.", Toast.LENGTH_LONG).show()
+        }
+    }
+
     private fun isDomainBlocked(url: String): Boolean {
         val host = runCatching { Uri.parse(url).host?.lowercase(Locale.ROOT) }.getOrNull() ?: return false
         return blockedDomains().any { host == it || host.endsWith("." + it) }
@@ -411,14 +438,58 @@ class MainActivity : Activity() {
                 prefs.edit().putBoolean("tracking_protection", !enabled).apply()
                 Toast.makeText(this, "Protection setting saved. It applies to new tabs.", Toast.LENGTH_LONG).show()
             }
-            .setNeutralButton("Clear browsing data") { _, _ ->
-                AlertDialog.Builder(this).setTitle("Clear local browser data")
-                    .setMessage("Clear saved history, bookmarks and tab restore data? Website cookies are not cleared.")
+            .setNeutralButton("Website data") { _, _ -> showWebsiteDataControls() }
+            .setNegativeButton("Close", null).show()
+    }
+
+    private fun showWebsiteDataControls() {
+        val actions = arrayOf("Clear cookies and site data", "Clear cached files", "Clear all browsing data")
+        val descriptions = arrayOf(
+            "Signs you out of websites and clears cookies, local storage, site permissions and related site data.",
+            "Removes cached images and files. Website sign-ins should remain.",
+            "Clears Gecko cookies, site storage, permissions and caches, plus Nova history, bookmarks and saved tabs. Downloaded files are not deleted."
+        )
+        AlertDialog.Builder(this).setTitle("Website data")
+            .setItems(actions) { _, which ->
+                AlertDialog.Builder(this).setTitle(actions[which]).setMessage(descriptions[which])
                     .setPositiveButton("Clear") { _, _ ->
-                        prefs.edit().remove("history").remove("bookmarks").remove("open_tabs").apply()
-                        Toast.makeText(this, "Local history, bookmarks and saved tabs cleared", Toast.LENGTH_LONG).show()
+                        val flags = when (which) {
+                            0 -> org.mozilla.geckoview.StorageController.ClearFlags.SITE_DATA
+                            1 -> org.mozilla.geckoview.StorageController.ClearFlags.ALL_CACHES
+                            else -> org.mozilla.geckoview.StorageController.ClearFlags.ALL
+                        }
+                        clearGeckoData(flags, which == 2)
                     }.setNegativeButton("Cancel", null).show()
             }.setNegativeButton("Close", null).show()
+    }
+
+    private fun clearGeckoData(flags: Long, clearNovaData: Boolean) {
+        val reopenUrl = current()?.url?.takeIf { it.startsWith("http://") || it.startsWith("https://") } ?: homePage()
+        tabs.toList().forEach { tab ->
+            tab.view.releaseSession()
+            if (tab.session.isOpen) tab.session.close()
+        }
+        tabs.clear()
+        active = 0
+        if (root.childCount > 2) root.removeViews(2, root.childCount - 2)
+        if (clearNovaData) {
+            val edit = prefs.edit().remove("history").remove("bookmarks").remove("open_tabs").remove("recently_closed")
+            prefs.all.keys.filter { it.startsWith("site_permission_") }.forEach { edit.remove(it) }
+            edit.apply()
+        }
+        runtime.storageController.clearData(flags).then<Void> {
+            runOnUiThread {
+                Toast.makeText(this, "Website data cleared.", Toast.LENGTH_LONG).show()
+                newTab(reopenUrl)
+            }
+            null
+        }.exceptionally<Void> { error ->
+            runOnUiThread {
+                Toast.makeText(this, "Could not clear website data: " + (error.message ?: "unknown error"), Toast.LENGTH_LONG).show()
+                newTab(reopenUrl)
+            }
+            null
+        }
     }
 
     private fun newTab(url: String = homePage(), restoredState: String? = null) {
@@ -431,10 +502,17 @@ class MainActivity : Activity() {
             .viewportMode(if (desktopMode) GeckoSessionSettings.VIEWPORT_MODE_DESKTOP else GeckoSessionSettings.VIEWPORT_MODE_MOBILE)
             .build()
         val session = GeckoSession(settings)
-        val view = GeckoView(this)
+        val view = GeckoView(this).apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) setAutofillEnabled(true)
+        }
         val tab = Tab(session, view, private = privateMode, group = if (privateMode) "Private" else (prefs.getString("active_group", "General") ?: "General"))
         session.setContentDelegate(object : GeckoSession.ContentDelegate {
             override fun onExternalResponse(session: GeckoSession, response: org.mozilla.geckoview.WebResponse) {
+                if (tab.private) {
+                    response.body?.close()
+                    runOnUiThread { Toast.makeText(this@MainActivity, "Downloads are disabled in private tabs.", Toast.LENGTH_LONG).show() }
+                    return
+                }
                 runOnUiThread { queueDownload(response.uri, response.headers["content-disposition"], response.headers["content-type"], response.body) }
             }
             override fun onFullScreen(session: GeckoSession, fullScreen: Boolean) {
@@ -459,10 +537,14 @@ class MainActivity : Activity() {
         })
         session.setNavigationDelegate(object : GeckoSession.NavigationDelegate {
             override fun onLoadRequest(session: GeckoSession, request: GeckoSession.NavigationDelegate.LoadRequest): GeckoResult<AllowOrDeny>? {
+                if (isExternalScheme(request.uri)) {
+                    openExternalUri(request.uri)
+                    return GeckoResult.deny()
+                }
                 return if (isDomainBlocked(request.uri)) GeckoResult.deny() else null
             }
             override fun onSubframeLoadRequest(session: GeckoSession, request: GeckoSession.NavigationDelegate.LoadRequest): GeckoResult<AllowOrDeny>? {
-                return if (isDomainBlocked(request.uri)) GeckoResult.deny() else null
+                return if (isDomainBlocked(request.uri) || isExternalScheme(request.uri)) GeckoResult.deny() else null
             }
             override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) { tab.canGoBack = canGoBack }
             override fun onCanGoForward(session: GeckoSession, canGoForward: Boolean) { tab.canGoForward = canGoForward }
