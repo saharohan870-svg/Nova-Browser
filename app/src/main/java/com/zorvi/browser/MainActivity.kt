@@ -172,7 +172,10 @@ class MainActivity : Activity() {
                 val next = url.orEmpty()
                 tab.url = next
                 if (current() === tab) address.setText(next)
-                if (!tab.private && (next.startsWith("https://", true) || next.startsWith("http://", true))) saveHistory(next)
+                if (!tab.private && (next.startsWith("https://", true) || next.startsWith("http://", true))) {
+                    saveHistory(next)
+                    saveTabs()
+                }
             }
         })
         session.setPromptDelegate(object : GeckoSession.PromptDelegate {
