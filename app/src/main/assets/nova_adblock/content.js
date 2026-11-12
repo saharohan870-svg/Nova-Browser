@@ -1,26 +1,12 @@
 "use strict";
-(() => {
-  const selectors = [
-    "iframe[src*='doubleclick.net']",
-    "iframe[src*='googlesyndication.com']",
-    "iframe[src*='adnxs.com']",
-    "iframe[src*='taboola.com']",
-    "iframe[src*='outbrain.com']",
-    "iframe[id^='google_ads']",
-    "ins.adsbygoogle",
-    "[id^='google_ads_']",
-    "[data-ad-slot]",
-    "[data-ad-client]"
-  ];
-  const hideKnownAdElements = () => {
-    for (const selector of selectors) {
-      document.querySelectorAll(selector).forEach(element => {
-        element.style.setProperty("display", "none", "important");
-      });
-    }
-  };
-  hideKnownAdElements();
-  const observer = new MutationObserver(hideKnownAdElements);
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-  setTimeout(() => observer.disconnect(), 15000);
+(async function(){
+ try {
+  const response=await browser.runtime.sendMessage({type:"cosmetics",host:location.hostname});
+  const selectors=(response&&response.selectors||[]).filter(x=>typeof x==="string"&&x.length<600);
+  if(!selectors.length)return;
+  const style=document.createElement("style");
+  style.id="nova-adblock-css";
+  style.textContent=selectors.map(x=>x+"{display:none!important}").join("\n");
+  (document.head||document.documentElement).appendChild(style);
+ } catch(_) {}
 })();
