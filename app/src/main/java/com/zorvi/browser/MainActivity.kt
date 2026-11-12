@@ -46,7 +46,6 @@ class MainActivity : Activity() {
     private var privateMode = false
     private var dark = false
     private var desktopMode = false
-    private var trackingProtection = true
     private var fullScreen = false
     private var pendingFilePrompt: GeckoSession.PromptDelegate.FilePrompt? = null
     private var pendingFileResult: GeckoResult<GeckoSession.PromptDelegate.PromptResponse>? = null
@@ -685,7 +684,7 @@ class MainActivity : Activity() {
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         saveTabs()
-        if (level >= TRIM_MEMORY_RUNNING_LOW) {
+        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
             tabs.forEachIndexed { index, tab -> if (index != active) tab.session.setActive(false) }
         }
     }
