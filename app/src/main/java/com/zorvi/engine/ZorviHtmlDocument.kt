@@ -168,8 +168,10 @@ internal data class HtmlDocument(
 
                 if (trimmed.startsWith("/")) {
                     val name = trimmed.drop(1).takeWhile { !it.isWhitespace() && it != '/' }.lowercase()
-                    if (name.isNotEmpty()) closeOpen(name)
-                    if (name == "head") switchToBody()
+                    when (name) {
+                        "head", "body", "html" -> switchToBody()
+                        else -> if (name.isNotEmpty()) closeOpen(name)
+                    }
                     continue
                 }
 
