@@ -1,0 +1,21 @@
+name: Ad blocker filter-engine tests
+on:
+  push:
+    branches: [chromium-engine-migration]
+    paths:
+      - 'app/src/main/assets/nova_adblock/**'
+      - 'tests/adblock/**'
+      - '.github/workflows/adblock-tests.yml'
+  pull_request:
+    paths:
+      - 'app/src/main/assets/nova_adblock/**'
+      - 'tests/adblock/**'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/adblock/filter-engine.test.cjs
