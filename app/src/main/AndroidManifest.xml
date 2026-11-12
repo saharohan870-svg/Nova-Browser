@@ -1,7 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <application android:theme="@android:style/Theme.Material.Light.NoActionBar" android:label="Zorvi Browser" android:usesCleartextTraffic="false">
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <application android:theme="@android:style/Theme.Material.Light.NoActionBar" android:label="Nova Browser" android:usesCleartextTraffic="false">
         <activity android:name=".ZorviPageActivity" android:exported="false" android:configChanges="keyboardHidden|orientation|screenSize" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
