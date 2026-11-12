@@ -274,7 +274,18 @@ class MainActivity : Activity() {
 
     @Deprecated("Deprecated in Android")
     override fun onBackPressed() {
-        activeSession()?.goBack() ?: super.onBackPressed()
+        val session = activeSession()
+        if (session != null) {
+            // GeckoSession.goBack() is asynchronous; use its navigation history
+            // to avoid consuming Android Back when the current page has no history.
+            session.navigationDelegate = object : GeckoSession.NavigationDelegate {
+                override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) {
+                    if (canGoBack) session.goBack() else super@MainActivity.onBackPressed()
+                }
+            }
+        } else {
+            super.onBackPressed()
+        }
     }
 
     override fun onDestroy() {
