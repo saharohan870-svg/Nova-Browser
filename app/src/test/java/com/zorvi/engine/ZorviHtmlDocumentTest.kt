@@ -116,6 +116,19 @@ class ZorviHtmlDocumentTest {
         assertTrue(document.textContent(document.findFirst("body")!!).contains("safe"))
     }
 
+
+    @Test fun treatsPlaintextAsTextUntilEndOfInput() {
+        val document = HtmlDocument.parse("<plaintext><b>not markup</b> &amp; still text")
+        assertEquals("<b>not markup</b> &amp; still text", document.textContent(document.findFirst("plaintext")!!))
+    }
+
+    @Test fun handlesLegacyRawTextElementsWithoutParsingNestedMarkup() {
+        val document = HtmlDocument.parse("<xmp><b>literal</b></xmp><iframe><p>frame text</p></iframe><p>After</p>")
+        assertEquals("<b>literal</b>", document.textContent(document.findFirst("xmp")!!))
+        assertEquals("<p>frame text</p>", document.textContent(document.findFirst("iframe")!!))
+        assertTrue(document.visibleBlocks().any { it.text == "After" })
+    }
+
     @Test fun malformedInputsDoNotCrashParser() {
         val samples = listOf(
             "<", "<<<<", "<a href='unterminated", "<div><span><p>x</div>",
