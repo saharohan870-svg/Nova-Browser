@@ -215,7 +215,7 @@ class MainActivity : Activity() {
                 else chooseAiProvider("Summarize this page using the extracted content.\nURL: $url\n\nPAGE CONTENT:\n$excerpt", "Summarize with")
             }
             null
-        }.exceptionally { error ->
+        }.exceptionally<Void> { error ->
             runOnUiThread { Toast.makeText(this, "Page extraction failed: " + (error.message ?: "unknown error"), Toast.LENGTH_LONG).show() }
             null
         }
@@ -268,7 +268,7 @@ class MainActivity : Activity() {
                 else showReaderContent(tab.title.ifBlank { "Reader view" }, article)
             }
             null
-        }.exceptionally { error ->
+        }.exceptionally<Void> { error ->
             runOnUiThread { Toast.makeText(this, "Reader extraction failed: " + error.message, Toast.LENGTH_LONG).show() }
             null
         }
@@ -316,7 +316,7 @@ class MainActivity : Activity() {
                     }
             }
             null
-        }.exceptionally { error ->
+        }.exceptionally<Void> { error ->
             runOnUiThread { Toast.makeText(this, "Page extraction failed: " + error.message, Toast.LENGTH_LONG).show() }
             null
         }
