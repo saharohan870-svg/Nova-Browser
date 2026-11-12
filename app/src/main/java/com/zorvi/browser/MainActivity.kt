@@ -405,7 +405,7 @@ class MainActivity : Activity() {
         val removed = current() ?: return
         tabs.removeAt(active)
         removed.session.setActive(false)
-        removed.view.setSession(null)
+        removed.view.releaseSession()
         removed.session.close()
         if (tabs.isEmpty()) newTab("https://www.google.com")
         else { active = active.coerceAtMost(tabs.lastIndex); showOnlyActive(); updateTabs() }
@@ -477,7 +477,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         tabs.forEach { tab ->
-            tab.view.setSession(null)
+            tab.view.releaseSession()
             if (tab.session.isOpen) tab.session.close()
         }
         tabs.clear()
