@@ -10,8 +10,8 @@ The parser in `app/src/main/java/com/zorvi/engine/ZorviHtmlDocument.kt` is a bou
 - Void elements, script/style raw text, title/textarea RCDATA, legacy raw-text elements, and plaintext.
 - Common implied end tags for paragraphs, lists, descriptions, options, headings, table rows/cells/sections, and ruby annotations.
 - Scoped implied-end-tag handling to avoid closing outer list items or table cells across nested structures.
-- Implied `tbody` and `tr` insertion for common table input.
-- HTML handling of the trailing slash on non-void elements.
+- Implied `tbody`, `tr`, and `colgroup` insertion for common table input.
+- HTML handling of the trailing slash on non-void elements, plus common nested-anchor/button recovery.
 - Initial newline removal for `pre`, `listing`, and `textarea`.
 - Common named entities, numeric references, and Windows-1252 numeric-reference remapping.
 - Source-size and tree-depth limits, reported through `HtmlDocument.sourceTruncated` and `HtmlDocument.nestingLimitReached`.
@@ -30,4 +30,4 @@ Run the Android module's unit tests with:
 ./gradlew :app:testDebugUnitTest
 ```
 
-The parser tests include regression fixtures for malformed input, nested lists/tables, implied containers, raw-text elements, entities, resource limits, and deterministic malformed-markup fuzz samples.
+The parser tests include regression fixtures for malformed input, nested lists/tables, implied containers, raw-text elements, entities, resource limits, and deterministic malformed-markup fuzz samples and table/interactive-element recovery.
