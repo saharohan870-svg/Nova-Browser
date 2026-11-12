@@ -34,5 +34,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("com.google.mlkit:translate:17.0.3")
     implementation("com.google.mlkit:language-id:17.0.6")
+    implementation("dev.ffmpegkit-maintained:llama-android:0.1.1")
     testImplementation("junit:junit:4.13.2")
 }
