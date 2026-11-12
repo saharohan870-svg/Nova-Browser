@@ -126,6 +126,16 @@ class ZorviHtmlDocumentTest {
     }
 
 
+    @Test fun closesNestedAnchorAndButtonStartTags() {
+        val document = HtmlDocument.parse("<a>First<a>Second</a><button>One<button>Two</button>")
+        assertEquals(2, document.findAll("a").size)
+        assertEquals(2, document.findAll("button").size)
+        assertEquals("First", document.textContent(document.findAll("a")[0]))
+        assertEquals("Second", document.textContent(document.findAll("a")[1]))
+        assertEquals("One", document.textContent(document.findAll("button")[0]))
+        assertEquals("Two", document.textContent(document.findAll("button")[1]))
+    }
+
     @Test fun preservesOuterListItemWhenNestedListStarts() {
         val document = HtmlDocument.parse("<ul><li>Outer<ul><li>Inner</li></ul></li><li>Second</li></ul>")
         val list = document.findFirst("ul")!!
