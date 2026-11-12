@@ -1,5 +1,6 @@
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.android")
 }
 
 android {
@@ -27,7 +28,6 @@ android {
 }
 
 dependencies {
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:2.2.10")
     // GeckoView is the primary web rendering engine. Keep QuickJS for the experimental Zorvi engine.
     implementation("org.mozilla.geckoview:geckoview:140.0.20250630155423")
     implementation("io.github.dokar3:quickjs-kt-android:1.0.15")
