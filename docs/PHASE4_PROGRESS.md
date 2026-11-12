@@ -28,3 +28,13 @@ Phase 4 validates the current Android browser build, exercises the Zorvi engine'
 
 ## Important limitations
 The app is GeckoView-based, not a Chromium build. The Zorvi renderer is experimental and does not yet replace GeckoView for general web browsing. Automated JVM tests cannot certify Android UI, media playback, site compatibility or real-device performance.\n## Additional Phase 4 implementation commits\n- `779dd676` — richer download manager and tab-group management.\n- `9994769f` — explicit 16-site compatibility result matrix and device regression checklist.\n
+
+## Guest Mode implementation (2026-11-12)
+- Added a separate **Guest Mode** control; Private Mode remains a separate control.
+- Guest tabs use GeckoView private sessions, are excluded from saved history and session restore, and cannot create bookmarks or downloads.
+- Guest site-permission choices are not persisted.
+- **End Guest** closes all guest tabs and returns to the previously active tab.
+- Guest tabs are labeled in the tab switcher.
+- Important outstanding privacy requirement: this does not yet route traffic through Tor or otherwise mask the public IP. GeckoView has no supported public proxy-configuration API; a real Tor route needs a separately integrated and verified routing layer. Do not describe Guest Mode as Tor-protected until that is implemented and tested.
+- Guest Mode and Private Mode currently both rely on GeckoView's private-session facility; separate isolated private profiles are not yet verified.
+- Android build and on-device lifecycle/data-cleletion tests are pending.
