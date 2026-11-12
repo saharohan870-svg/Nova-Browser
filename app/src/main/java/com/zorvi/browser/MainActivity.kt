@@ -35,6 +35,13 @@ import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.TranslatorOptions
 import java.net.URLEncoder
 import java.util.Locale
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import dev.ffmpegkit.llama.Llama
+import dev.ffmpegkit.llama.LlamaConfig
 
 /**
  * Nova Browser main shell backed by Mozilla GeckoView.
@@ -60,6 +67,9 @@ class MainActivity : Activity() {
     private val prefs by lazy { getSharedPreferences("zorvi", Context.MODE_PRIVATE) }
     private val engines = listOf("Google", "Bing", "DuckDuckGo", "Brave Search")
     private val runtime: GeckoRuntime by lazy { getOrCreateRuntime() }
+    private val aiScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val requestModel = 4103
+    private fun modelFile(): File = File(File(filesDir, "models"), "nova-model.gguf")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -168,19 +178,53 @@ class MainActivity : Activity() {
     }
 
     private fun showAdvancedTools() {
-        val actions = arrayOf("Ask AI assistant", "Summarize current page with AI", "Translate current page", "Translation language", "Reader view", "Customize home page")
+        val actions = arrayOf("Ask AI assistant", "Summarize current page with AI", "Offline AI model", "Translate current page", "Translation language", "Reader view", "Customize home page")
         AlertDialog.Builder(this).setTitle("Nova tools").setItems(actions) { _, which ->
             when (which) {
                 0 -> askAiAssistant()
                 1 -> summarizeCurrentPage()
-                2 -> translateCurrentPageOffline()
-                3 -> chooseTranslationLanguage()
-                4 -> openReaderView()
-                5 -> customizeHomePage()
+                2 -> manageOfflineModel()
+                3 -> translateCurrentPageOffline()
+                4 -> chooseTranslationLanguage()
+                5 -> openReaderView()
+                6 -> customizeHomePage()
             }
         }.show()
     }
 
+    private fun manageOfflineModel() {
+        val file = modelFile()
+        val installed = file.exists()
+        AlertDialog.Builder(this).setTitle("Offline AI model")
+            .setMessage(if (installed) "A GGUF model is installed (" + (file.length() / (1024 * 1024)) + " MB). Inference runs on this device."
+                else "Choose a GGUF model file. Nova copies it into app storage and runs inference locally. A small 0.5B Q4 model is recommended for phones.")
+            .setPositiveButton(if (installed) "Replace model" else "Choose GGUF") { _, _ ->
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE)
+                startActivityForResult(intent, requestModel)
+            }
+            .setNeutralButton(if (installed) "Remove model" else "Close") { _, _ ->
+                if (installed) { file.delete(); Toast.makeText(this, "Offline model removed", Toast.LENGTH_SHORT).show() }
+            }.setNegativeButton("Close", null).show()
+    }
+
+    private fun askOfflineModel(question: String, onResult: (String) -> Unit) {
+        val file = modelFile()
+        if (!file.exists()) { onResult("No offline GGUF model installed. Open Tools → Offline AI model to select one."); return }
+        aiScope.launch {
+            val answer = withContext(Dispatchers.IO) {
+                var model: Any? = null
+                try {
+                    model = Llama.loadModel(modelPath = file.absolutePath, config = LlamaConfig(contextSize = 2048, threads = 4))
+                    Llama.complete(model, prompt = question, systemPrompt = "You are Nova's offline assistant. Be accurate and concise.", maxTokens = 256).text
+                } catch (error: Exception) {
+                    "Offline AI failed: " + (error.message ?: "unknown error")
+                } finally {
+                    if (model != null) runCatching { Llama.releaseModel(model) }
+                }
+            }
+            onResult(answer)
+        }
+    }
     private fun chooseAiProvider(prompt: String, title: String) {
         val providers = arrayOf("Perplexity", "ChatGPT")
         AlertDialog.Builder(this).setTitle(title).setItems(providers) { _, which ->
@@ -193,11 +237,17 @@ class MainActivity : Activity() {
 
     private fun askAiAssistant() {
         val prompt = EditText(this).apply { hint = "Ask anything…" }
-        AlertDialog.Builder(this).setTitle("Nova AI assistant")
-            .setMessage("Choose Perplexity or ChatGPT after entering your question.")
-            .setView(prompt).setPositiveButton("Continue") { _, _ ->
+        val choices = arrayOf("Perplexity (online)", "ChatGPT (online)", "Nova Offline AI")
+        AlertDialog.Builder(this).setTitle("Nova AI assistant").setView(prompt)
+            .setItems(choices) { _, which ->
                 val question = prompt.text.toString().trim()
-                if (question.isNotEmpty()) chooseAiProvider(question, "Choose AI assistant")
+                if (question.isNotEmpty()) when (which) {
+                    0 -> chooseAiProvider(question, "Choose AI assistant")
+                    1 -> newTab("https://chatgpt.com/?q=" + URLEncoder.encode(question, "UTF-8"))
+                    2 -> askOfflineModel(question) { answer ->
+                        AlertDialog.Builder(this).setTitle("Nova Offline AI").setMessage(answer).setPositiveButton("Done", null).show()
+                    }
+                }
             }.setNegativeButton("Cancel", null).show()
     }
 
@@ -821,6 +871,23 @@ class MainActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == requestModel) {
+            if (resultCode == RESULT_OK && data?.data != null) {
+                val source = data.data!!
+                Thread {
+                    try {
+                        val target = modelFile()
+                        target.parentFile?.mkdirs()
+                        contentResolver.openInputStream(source)?.use { input -> target.outputStream().use { output -> input.copyTo(output) } }
+                            ?: throw IllegalStateException("Could not read selected model")
+                        runOnUiThread { Toast.makeText(this, "GGUF model imported. Offline AI is ready.", Toast.LENGTH_LONG).show() }
+                    } catch (error: Exception) {
+                        runOnUiThread { Toast.makeText(this, "Model import failed: " + error.message, Toast.LENGTH_LONG).show() }
+                    }
+                }.start()
+            }
+            return
+        }
         if (requestCode == requestFile) {
             val prompt = pendingFilePrompt
             val result = pendingFileResult
@@ -992,7 +1059,16 @@ class MainActivity : Activity() {
         @Volatile private var sharedRuntime: GeckoRuntime? = null
         private fun getOrCreateRuntime(context: Context): GeckoRuntime =
             sharedRuntime ?: synchronized(this) {
-                sharedRuntime ?: GeckoRuntime.create(context.applicationContext).also { sharedRuntime = it }
+                sharedRuntime ?: GeckoRuntime.create(context.applicationContext).also { created ->
+                    sharedRuntime = created
+                    created.webExtensionController.ensureBuiltIn(
+                        "resource://android/assets/nova_adblock/",
+                        "nova-adblock@zorvi.browser"
+                    ).accept(
+                        { android.util.Log.i("NovaAdBlock", "Network request filter installed") },
+                        { error -> android.util.Log.e("NovaAdBlock", "Could not install request filter", error) }
+                    )
+                }
             }
     }
 
