@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
-  "name": "Nova Network Filter",
-  "version": "1.0.0",
-  "description": "Blocks known advertising and tracking network endpoints in Nova Browser.",
+  "name": "Nova Ad Blocker",
+  "version": "2.0.0",
+  "description": "EasyList and EasyPrivacy filter subscriptions for Nova Browser.",
   "applications": {
     "gecko": {
       "id": "nova-adblock@zorvi.browser",
@@ -12,10 +12,17 @@
   "permissions": [
     "webRequest",
     "webRequestBlocking",
-    "<all_urls>"
+    "webNavigation",
+    "tabs",
+    "storage",
+    "alarms",
+    "http://*/*",
+    "https://*/*",
+    "https://easylist.to/*"
   ],
   "background": {
     "scripts": [
+      "filter-engine.js",
       "background.js"
     ]
   },
@@ -28,7 +35,7 @@
       "js": [
         "content.js"
       ],
-      "run_at": "document_idle"
+      "run_at": "document_start"
     }
   ]
 }
