@@ -220,13 +220,23 @@ internal data class HtmlDocument(val root: HtmlNode) {
                         closeOpenInScope("th", boundaries)
                     }
                     "thead", "tbody", "tfoot" -> {
-                        closeOpen("td"); closeOpen("th"); closeOpen("tr")
-                        closeOpen("thead"); closeOpen("tbody"); closeOpen("tfoot")
+                        val cellBoundaries = setOf("table", "tbody", "thead", "tfoot", "tr")
+                        closeOpenInScope("td", cellBoundaries)
+                        closeOpenInScope("th", cellBoundaries)
+                        closeOpenInScope("tr", setOf("table", "tbody", "thead", "tfoot"))
+                        closeOpenInScope("thead", setOf("table"))
+                        closeOpenInScope("tbody", setOf("table"))
+                        closeOpenInScope("tfoot", setOf("table"))
                     }
                     "caption", "colgroup" -> {
-                        closeOpen("td"); closeOpen("th"); closeOpen("tr")
-                        closeOpen("thead"); closeOpen("tbody"); closeOpen("tfoot")
-                        closeOpen(name)
+                        val cellBoundaries = setOf("table", "tbody", "thead", "tfoot", "tr")
+                        closeOpenInScope("td", cellBoundaries)
+                        closeOpenInScope("th", cellBoundaries)
+                        closeOpenInScope("tr", setOf("table", "tbody", "thead", "tfoot"))
+                        closeOpenInScope("thead", setOf("table"))
+                        closeOpenInScope("tbody", setOf("table"))
+                        closeOpenInScope("tfoot", setOf("table"))
+                        closeOpenInScope(name, setOf("table"))
                     }
                 }
                 if (name in headingTags) headingTags.forEach(::closeOpen)
