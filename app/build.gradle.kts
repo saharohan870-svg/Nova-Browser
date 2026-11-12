@@ -32,5 +32,7 @@ dependencies {
     implementation("org.mozilla.geckoview:geckoview:149.0.20260330092855")
     implementation("io.github.dokar3:quickjs-kt-android:1.0.15")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("com.google.mlkit:translate:17.0.3")
+    implementation("com.google.mlkit:language-id:17.0.6")
     testImplementation("junit:junit:4.13.2")
 }
