@@ -45,6 +45,7 @@ class MainActivity : Activity() {
     private var active = 0
     private var privateMode = false
     private var dark = false
+    private var desktopMode = false
     private var fullScreen = false
     private var pendingFilePrompt: GeckoSession.PromptDelegate.FilePrompt? = null
     private var pendingFileResult: GeckoResult<GeckoSession.PromptDelegate.PromptResponse>? = null
@@ -112,6 +113,9 @@ class MainActivity : Activity() {
             setOnClickListener { showTabs() }
         }
         controls.addView(tabsLabel)
+        controls.addView(button("AI Sites") { showCompatibilitySites(true) })
+        controls.addView(button("Sites") { showCompatibilitySites(false) })
+        controls.addView(button("Desktop") { toggleDesktopMode() })
         controls.addView(button("Group") { manageGroups() })
         controls.addView(button("Downloads") { showDownloads() })
         controls.addView(button("PiP") { enterPip() })
@@ -134,9 +138,13 @@ class MainActivity : Activity() {
     private fun current(): Tab? = tabs.getOrNull(active)
 
     private fun newTab(url: String = "about:blank", restoredState: String? = null) {
+        desktopMode = prefs.getBoolean("desktop_mode", false)
         val settings = GeckoSessionSettings.Builder()
             .usePrivateMode(privateMode)
             .useTrackingProtection(true)
+            .allowJavascript(true)
+            .userAgentMode(if (desktopMode) GeckoSessionSettings.USER_AGENT_MODE_DESKTOP else GeckoSessionSettings.USER_AGENT_MODE_MOBILE)
+            .viewportMode(if (desktopMode) GeckoSessionSettings.VIEWPORT_MODE_DESKTOP else GeckoSessionSettings.VIEWPORT_MODE_MOBILE)
             .build()
         val session = GeckoSession(settings)
         val view = GeckoView(this)
@@ -285,6 +293,49 @@ class MainActivity : Activity() {
         current()?.session?.loadUri(target)
     }
 
+    private data class SiteShortcut(val name: String, val url: String)
+
+    private val aiShortcuts = listOf(
+        SiteShortcut("ChatGPT", "https://chatgpt.com/"),
+        SiteShortcut("Claude", "https://claude.ai/"),
+        SiteShortcut("Google Gemini", "https://gemini.google.com/"),
+        SiteShortcut("Microsoft Copilot", "https://copilot.microsoft.com/"),
+        SiteShortcut("Perplexity", "https://www.perplexity.ai/"),
+        SiteShortcut("Grok", "https://grok.com/"),
+        SiteShortcut("DeepSeek", "https://chat.deepseek.com/"),
+        SiteShortcut("Mistral Le Chat", "https://chat.mistral.ai/"),
+        SiteShortcut("Meta AI", "https://www.meta.ai/")
+    )
+
+    private val otherShortcuts = listOf(
+        SiteShortcut("Google", "https://www.google.com/"),
+        SiteShortcut("YouTube", "https://www.youtube.com/"),
+        SiteShortcut("GitHub", "https://github.com/"),
+        SiteShortcut("Instagram", "https://www.instagram.com/"),
+        SiteShortcut("Discord", "https://discord.com/app"),
+        SiteShortcut("WhatsApp Web", "https://web.whatsapp.com/"),
+        SiteShortcut("Microsoft 365", "https://www.microsoft365.com/")
+    )
+
+    private fun showCompatibilitySites(aiOnly: Boolean) {
+        val sites = if (aiOnly) aiShortcuts else aiShortcuts + otherShortcuts
+        AlertDialog.Builder(this).setTitle(if (aiOnly) "AI websites" else "Website compatibility shortcuts")
+            .setItems(sites.map { it.name }.toTypedArray()) { _, index ->
+                val target = sites[index].url
+                current()?.session?.loadUri(target) ?: newTab(target)
+            }.setNegativeButton("Close", null).show()
+    }
+
+    private fun toggleDesktopMode() {
+        desktopMode = !desktopMode
+        prefs.edit().putBoolean("desktop_mode", desktopMode).apply()
+        current()?.let { tab ->
+            tab.session.settings.setUserAgentMode(if (desktopMode) GeckoSessionSettings.USER_AGENT_MODE_DESKTOP else GeckoSessionSettings.USER_AGENT_MODE_MOBILE)
+            tab.session.settings.setViewportMode(if (desktopMode) GeckoSessionSettings.VIEWPORT_MODE_DESKTOP else GeckoSessionSettings.VIEWPORT_MODE_MOBILE)
+            tab.session.reload()
+        }
+        Toast.makeText(this, if (desktopMode) "Desktop site mode enabled" else "Mobile site mode enabled", Toast.LENGTH_SHORT).show()
+    }
     private fun openInZorvi() {
         val target = current()?.url?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
         if (target.isNullOrBlank()) return
