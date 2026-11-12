@@ -245,9 +245,9 @@ internal data class HtmlDocument(val root: HtmlNode) {
                 current().children += node
                 // HTML ignores one initial LF (or CRLF) in preformatted text elements.
                 if (name in setOf("pre", "listing", "textarea") && cursor < input.length) {
-                    if (input[cursor] == '\\r' && cursor + 1 < input.length && input[cursor + 1] == '\\n') {
+                    if (input[cursor] == '\r' && cursor + 1 < input.length && input[cursor + 1] == '\n') {
                         cursor += 2
-                    } else if (input[cursor] == '\\n' || input[cursor] == '\\r') {
+                    } else if (input[cursor] == '\n' || input[cursor] == '\r') {
                         cursor++
                     }
                 }
