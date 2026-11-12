@@ -46,6 +46,7 @@ class MainActivity : Activity() {
     private var privateMode = false
     private var dark = false
     private var desktopMode = false
+    private var trackingProtection = true
     private var fullScreen = false
     private var pendingFilePrompt: GeckoSession.PromptDelegate.FilePrompt? = null
     private var pendingFileResult: GeckoResult<GeckoSession.PromptDelegate.PromptResponse>? = null
@@ -60,7 +61,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         buildUi()
         restoreTabs()
-        if (tabs.isEmpty()) newTab("https://www.google.com")
+        if (tabs.isEmpty()) newTab(homePage())
     }
 
     private fun buildUi() {
@@ -116,6 +117,9 @@ class MainActivity : Activity() {
         controls.addView(button("AI Sites") { showCompatibilitySites(true) })
         controls.addView(button("Sites") { showCompatibilitySites(false) })
         controls.addView(button("Desktop") { toggleDesktopMode() })
+        controls.addView(button("Home") { openHome() })
+        controls.addView(button("Tools") { showAdvancedTools() })
+        controls.addView(button("Shield") { showPrivacyControls() })
         controls.addView(button("Group") { manageGroups() })
         controls.addView(button("Downloads") { showDownloads() })
         controls.addView(button("PiP") { enterPip() })
@@ -137,11 +141,99 @@ class MainActivity : Activity() {
 
     private fun current(): Tab? = tabs.getOrNull(active)
 
-    private fun newTab(url: String = "about:blank", restoredState: String? = null) {
+    private fun homePage(): String = prefs.getString("home_page", "https://www.google.com") ?: "https://www.google.com"
+
+    private fun openHome() {
+        current()?.session?.loadUri(homePage()) ?: newTab(homePage())
+    }
+
+    private fun customizeHomePage() {
+        val field = EditText(this).apply { hint = "https://example.com"; setText(homePage()); isSingleLine = true }
+        AlertDialog.Builder(this).setTitle("Set home page")
+            .setMessage("Enter the page Nova should open with Home and new tabs.")
+            .setView(field).setPositiveButton("Save") { _, _ ->
+                val raw = field.text.toString().trim()
+                val value = if (raw.startsWith("https://") || raw.startsWith("http://")) raw else "https://$raw"
+                if (Uri.parse(value).host != null) {
+                    prefs.edit().putString("home_page", value).apply()
+                    Toast.makeText(this, "Home page saved", Toast.LENGTH_SHORT).show()
+                } else Toast.makeText(this, "Enter a valid website address", Toast.LENGTH_SHORT).show()
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun showAdvancedTools() {
+        val actions = arrayOf("Ask AI assistant", "Summarize current page with AI", "Translate current page", "Reader view", "Customize home page")
+        AlertDialog.Builder(this).setTitle("Nova tools").setItems(actions) { _, which ->
+            when (which) {
+                0 -> askAiAssistant()
+                1 -> summarizeCurrentPage()
+                2 -> translateCurrentPage()
+                3 -> openReaderView()
+                4 -> customizeHomePage()
+            }
+        }.show()
+    }
+
+    private fun askAiAssistant() {
+        val prompt = EditText(this).apply { hint = "Ask anything…" }
+        AlertDialog.Builder(this).setTitle("Nova AI assistant")
+            .setMessage("Nova will open ChatGPT with your question.")
+            .setView(prompt).setPositiveButton("Ask") { _, _ ->
+                val question = prompt.text.toString().trim()
+                if (question.isNotEmpty()) newTab("https://chatgpt.com/?q=" + URLEncoder.encode(question, "UTF-8"))
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun summarizeCurrentPage() {
+        val url = current()?.url.orEmpty()
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            Toast.makeText(this, "Open a webpage first", Toast.LENGTH_SHORT).show(); return
+        }
+        val prompt = "Please open and summarize this webpage. If you cannot access it, tell me: $url"
+        newTab("https://chatgpt.com/?q=" + URLEncoder.encode(prompt, "UTF-8"))
+    }
+
+    private fun translateCurrentPage() {
+        val url = current()?.url.orEmpty()
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            Toast.makeText(this, "Open a webpage first", Toast.LENGTH_SHORT).show(); return
+        }
+        val language = prefs.getString("translation_language", "en") ?: "en"
+        current()?.session?.loadUri("https://translate.google.com/translate?sl=auto&tl=" + language + "&u=" + URLEncoder.encode(url, "UTF-8"))
+    }
+
+    private fun openReaderView() {
+        val url = current()?.url.orEmpty()
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            Toast.makeText(this, "Open an article first", Toast.LENGTH_SHORT).show(); return
+        }
+        current()?.session?.loadUri("about:reader?url=" + URLEncoder.encode(url, "UTF-8"))
+    }
+
+    private fun showPrivacyControls() {
+        val enabled = prefs.getBoolean("tracking_protection", true)
+        val message = "GeckoView tracking protection is " + (if (enabled) "enabled." else "disabled.") +
+            "\\n\\nThis applies to newly created tabs. It is not a complete standalone ad blocker."
+        AlertDialog.Builder(this).setTitle("Privacy and protection").setMessage(message)
+            .setPositiveButton(if (enabled) "Turn off" else "Turn on") { _, _ ->
+                prefs.edit().putBoolean("tracking_protection", !enabled).apply()
+                Toast.makeText(this, "Protection setting saved. It applies to new tabs.", Toast.LENGTH_LONG).show()
+            }
+            .setNeutralButton("Clear browsing data") { _, _ ->
+                AlertDialog.Builder(this).setTitle("Clear local browser data")
+                    .setMessage("Clear saved history, bookmarks and tab restore data? Website cookies are not cleared.")
+                    .setPositiveButton("Clear") { _, _ ->
+                        prefs.edit().remove("history").remove("bookmarks").remove("open_tabs").apply()
+                        Toast.makeText(this, "Local history, bookmarks and saved tabs cleared", Toast.LENGTH_LONG).show()
+                    }.setNegativeButton("Cancel", null).show()
+            }.setNegativeButton("Close", null).show()
+    }
+
+    private fun newTab(url: String = homePage(), restoredState: String? = null) {
         desktopMode = prefs.getBoolean("desktop_mode", false)
         val settings = GeckoSessionSettings.Builder()
             .usePrivateMode(privateMode)
-            .useTrackingProtection(true)
+            .useTrackingProtection(prefs.getBoolean("tracking_protection", true))
             .allowJavascript(true)
             .userAgentMode(if (desktopMode) GeckoSessionSettings.USER_AGENT_MODE_DESKTOP else GeckoSessionSettings.USER_AGENT_MODE_MOBILE)
             .viewportMode(if (desktopMode) GeckoSessionSettings.VIEWPORT_MODE_DESKTOP else GeckoSessionSettings.VIEWPORT_MODE_MOBILE)
@@ -503,13 +595,28 @@ class MainActivity : Activity() {
         }.toMutableList()
         names.add("＋ New tab")
         names.add("＋ New tab group")
+        names.add("Close other tabs")
         AlertDialog.Builder(this).setTitle("Nova tabs").setItems(names.toTypedArray()) { _, which ->
             when (which) {
-                tabs.size -> newTab("https://www.google.com")
+                tabs.size -> newTab(homePage())
                 tabs.size + 1 -> createGroup()
+                tabs.size + 2 -> closeOtherTabs()
                 else -> { active = which; showOnlyActive(); updateTabs() }
             }
         }.setNegativeButton("Close current") { _, _ -> closeTab() }.show()
+    }
+
+    private fun closeOtherTabs() {
+        val keep = current() ?: return
+        tabs.toList().filter { it !== keep }.forEach { tab ->
+            tabs.remove(tab)
+            tab.view.releaseSession()
+            if (tab.session.isOpen) tab.session.close()
+        }
+        active = tabs.indexOf(keep).coerceAtLeast(0)
+        showOnlyActive()
+        updateTabs()
+        saveTabs()
     }
 
     private fun closeTab() {
@@ -573,6 +680,14 @@ class MainActivity : Activity() {
         val tab = current()
         if (fullScreen) setBrowserFullScreen(false)
         else if (tab != null && tab.canGoBack) tab.session.goBack() else if (tabs.size > 1) closeTab() else super.onBackPressed()
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        saveTabs()
+        if (level >= TRIM_MEMORY_RUNNING_LOW) {
+            tabs.forEachIndexed { index, tab -> if (index != active) tab.session.setActive(false) }
+        }
     }
 
     override fun onResume() {
