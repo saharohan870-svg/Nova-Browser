@@ -1,18 +1,30 @@
-# Zorvi Browser
+# Nova Browser
 
-An Android browser prototype with a Chrome-inspired interface and Chromium-based Android WebView engine.
+An Android browser prototype with a Chrome-inspired interface, powered by Mozilla GeckoView on the `chromium-engine-migration` branch. The separate Zorvi renderer remains experimental and is not the default web engine.
 
-## Current prototype features
-- Address/search bar with selectable Google, Bing, DuckDuckGo and Brave Search
-- Back, forward, reload and bookmarks
-- Multiple WebView tabs with a tab switcher
-- Private-mode toggle for newly opened tabs (prototype; not a hardened isolated profile)
-- DownloadManager integration
-- Basic host-based request blocking
-- Dark toolbar/background toggle
+## Current browser features
+
+- GeckoView-based web rendering
+- Address/search bar with Google, Bing, DuckDuckGo and Brave Search
+- Back, forward, reload, multiple tabs and tab groups
+- Private GeckoSession mode and tracking protection
+- Bookmarks, browsing history and saved tab/session state
+- Downloads and website file-picker support
+- Website permission prompts for supported browser permissions
+- Fullscreen video and picture-in-picture entry point
+- Mobile/desktop user-agent and viewport modes
+- Quick links for ChatGPT, Claude, Gemini, Copilot, Perplexity, Grok, DeepSeek, Mistral Le Chat and Meta AI
+- Quick links for Google, YouTube, GitHub, Instagram, Discord, WhatsApp Web and Microsoft 365
+- Dark browser toolbar theme
+
+## Compatibility status
+
+The AI and major-site shortcuts are navigation conveniences, not compatibility certifications. Successful sign-in, streaming responses, voice, media, uploads and session restoration still require final testing on a real Android device. See [the Phase 2 compatibility plan](docs/SEVEN_SITE_COMPATIBILITY_TEST_PLAN.md).
 
 ## Build
-Open this repository in Android Studio, allow Gradle sync, then run the `app` configuration on an Android device (Android 8.0+).
 
-## Important limitations
-This is an early prototype, not a full Chromium distribution. It uses the device's Android System WebView. The host blocklist is small and is not a complete ad/tracker filter. History/bookmarks UI, tab groups, a true isolated private profile, and the AI assistant are not implemented yet.
+Open this repository in Android Studio, allow Gradle sync, then run the `app` configuration on an Android device (Android 8.0+). CI build artifacts are published by GitHub Actions when the workflow succeeds.
+
+## Known limitations
+
+This is not a full Chromium distribution. GeckoView is a separate Firefox/Gecko engine; it does not guarantee identical Chromium behavior or every site's support. The experimental Zorvi renderer is not standards-complete and is not intended for modern AI web apps. Browser UI and web-app behavior remain subject to compatibility testing.
