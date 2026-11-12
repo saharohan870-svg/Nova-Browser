@@ -1,6 +1,6 @@
 # Phase 1 — Nova VPN implementation plan
 
-Status: **blocked on VPN service provisioning; no tunnel is implemented**
+Status: **AdGuard selected; blocked on partner approval and SDK/API provisioning; no tunnel is implemented**
 
 Branch: `chromium-engine-migration`
 Last reviewed: 2026-11-12
@@ -85,27 +85,50 @@ Automated / integration tests:
 
 Physical-device tests are mandatory before marking the feature production-ready.
 
-## Current blocker — one decision / external input
+## Selected provider: AdGuard VPN white-label SDK
 
-**A real VPN operator must be selected and provide integration access.** No provider, server fleet, credentials, SDK or endpoint is currently available in this project. This cannot be solved by adding Android permissions or writing a placeholder service.
+AdGuard is the selected provider for Phase 1. Its public partner material describes an Android VPN SDK, provider-operated server infrastructure, a kill switch, custom DNS, website/app exclusions, and a server-side API for provisioning access tokens and reporting usage. The public material does not grant Nova SDK access or credentials.
 
-Once provider access is available, implementation can continue against its actual SDK/API. Until then, keep the feature visibly Not configured and do not advertise Nova VPN as available.
+Official entry points:
+- White-label VPN: https://adguardpartner.com/en/white-label-vpn.html
+- Technology partnership / VPN SDK: https://adguard.com/en/partners/technology.html
+- Current SDK and provisioning details must be obtained directly from AdGuard after partner onboarding.
+
+### Required from AdGuard before SDK integration
+
+1. Written acceptance of Nova Browser as a technology/white-label partner.
+2. Android VPN SDK package/repository access, exact supported SDK version, sample app and integration documentation.
+3. SDK license and redistribution terms covering Nova Browser.
+4. Partner/project identifier and any client-side configuration values.
+5. Server-side API credentials and provisioning documentation for issuing/revoking per-user VPN access tokens. These must be held by a backend, not embedded as shared secrets in the APK.
+6. Test account/token, test gateway access and a documented way to verify tunnel state and usage.
+7. Commercial terms: setup fee, minimum commitment, per-active-user or revenue-share pricing, free-tier limits, supported countries/locations and support SLA.
+8. Written privacy/data-processing terms, logging/retention policy, subprocessors, jurisdiction, incident handling and user-facing disclosure requirements.
+
+### Integration plan once access is granted
+
+- Review the SDK sample and license; pin the exact SDK version and verify minSdk 26 / targetSdk 35 compatibility.
+- Implement an AdGuard-backed provider adapter; keep provider-specific types out of browser UI.
+- Add a backend token-provisioning endpoint. Never place partner API secrets in the Android app, GitHub, or a public config file.
+- Integrate the provider SDK's Android tunnel lifecycle, consent flow, foreground notification, connection callbacks, DNS and kill-switch controls exactly as documented by AdGuard.
+- Initially route Nova Browser traffic only if the SDK supports reliable per-app routing. Otherwise pause and decide whether device-wide VPN is acceptable before implementation.
+- Add explicit UI states and only report Connected after provider confirmation and routing validation.
+- Test IPv4/IPv6, DNS, WebRTC, reconnect, network handover, kill switch, revoke and app process death on a physical Android device.
+
+### Current external blocker
+
+**AdGuard partner approval and private integration materials are not present in this repository or this chat.** We have not contacted AdGuard, received a quote, accepted terms, or received an SDK, project ID, API credentials, access token, or test gateway. I cannot truthfully implement or test the provider tunnel until those are supplied.
+
+The next external action is to submit the partner enquiry using the request brief in `docs/ADGUARD_PARTNER_REQUEST.md`. Once AdGuard replies, provide the SDK package/documentation and credentials through a secure provider-approved channel. Do not paste production secrets into chat or commit them to GitHub.
+
+Until then, keep Nova VPN visibly Not configured and do not advertise it as available.
 
 ## Release gate
 
 Phase 1 is complete only when a release build connects to real provider gateways, shows truthful connection state, passes the routing/leak tests above on a physical Android device, and includes accurate provider/privacy disclosures. A successful compile or CI run alone is not evidence of VPN protection.
 
 
-## Provider candidates researched (not approved or contacted)
+## Provider selection record
 
-These are integration leads, not endorsements. Public partner pages do not establish that Nova has been accepted, that pricing is suitable, or that SDK access is available to an individual project.
-
-| Candidate | Publicly described option | Important caveat |
-|---|---|---|
-| AdGuard VPN | White-label VPN SDK and provider infrastructure: https://adguardpartner.com/en/white-label-vpn.html | Requires a partner enquiry and commercial agreement; SDK docs/access are not public. |
-| KeepSolid VPN Unlimited OEM | VPN SDK/API and white-label infrastructure: https://oem.vpnunlimited.com/ | Requires provider onboarding and commercial terms. |
-| WLVPN / VIPRE | VPN SDKs and reseller API: https://wlvpn.com/ | Requires partner access and credentials. |
-| Windscribe | Backend API integration or reseller partnership: https://windscribe.com/white-label-vpn | Windscribe states it does not provide an SDK; API integration is a longer engineering path. |
-
-**Preliminary engineering fit:** AdGuard, KeepSolid and WLVPN publicly describe SDK-style integration, which is closer to Nova's desired in-app experience. No candidate is selected. Compare written quotes, SDK documentation, Android sample app, service geography, privacy/audit evidence, and minimum commitments before choosing.
+AdGuard VPN white-label SDK selected by the project owner on 2026-11-12. KeepSolid and WLVPN are no longer active candidates unless AdGuard cannot provide suitable terms or Android integration access.
 
