@@ -255,7 +255,13 @@ class MainActivity : Activity() {
                 if (current() === tab) closeTab()
             }
             override fun onCrash(session: GeckoSession) {
-                runOnUiThread { Toast.makeText(this@MainActivity, "Page process crashed. Reload this tab.", Toast.LENGTH_LONG).show() }
+                runOnUiThread {
+                    AlertDialog.Builder(this@MainActivity).setTitle("Page crashed")
+                        .setMessage("This tab stopped unexpectedly.")
+                        .setPositiveButton("Reload") { _, _ -> tab.session.reload() }
+                        .setNegativeButton("Close tab") { _, _ -> if (current() === tab) closeTab() }
+                        .setNeutralButton("Keep tab", null).show()
+                }
             }
         })
         session.setNavigationDelegate(object : GeckoSession.NavigationDelegate {
