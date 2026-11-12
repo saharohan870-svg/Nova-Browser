@@ -159,6 +159,10 @@ class MainActivity : Activity() {
         session.setNavigationDelegate(object : GeckoSession.NavigationDelegate {
             override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) { tab.canGoBack = canGoBack }
             override fun onCanGoForward(session: GeckoSession, canGoForward: Boolean) { tab.canGoForward = canGoForward }
+            override fun onNewSession(session: GeckoSession, uri: String): GeckoResult<GeckoSession> {
+                runOnUiThread { newTab("about:blank") }
+                return GeckoResult.fromValue(tabs.lastOrNull()?.session)
+            }
             override fun onLocationChange(
                 session: GeckoSession,
                 url: String?,
