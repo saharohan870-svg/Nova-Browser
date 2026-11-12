@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.zorvi.browser"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.zorvi.browser"
