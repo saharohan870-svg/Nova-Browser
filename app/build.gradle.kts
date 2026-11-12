@@ -11,8 +11,8 @@ android {
         applicationId = "com.zorvi.browser"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.4.0"
     }
 
     compileOptions {
@@ -28,7 +28,8 @@ android {
 }
 
 dependencies {
-    // Standalone QuickJS runtime; not Chromium/V8 or Android System WebView.
+    // GeckoView is the primary web rendering engine. Keep QuickJS for the experimental Zorvi engine.
+    implementation("org.mozilla.geckoview:geckoview:162.0.20261111213251")
     implementation("io.github.dokar3:quickjs-kt-android:1.0.15")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     testImplementation("junit:junit:4.13.2")
