@@ -169,8 +169,12 @@ class MainActivity : Activity() {
                 val result = GeckoResult<GeckoSession.PromptDelegate.PromptResponse>()
                 pendingFilePrompt = prompt
                 pendingFileResult = result
-                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE)
-                    .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, prompt.type == GeckoSession.PromptDelegate.FilePrompt.Type.MULTIPLE)
+                val intent = if (prompt.type == GeckoSession.PromptDelegate.FilePrompt.Type.FOLDER) {
+                    Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+                } else {
+                    Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE)
+                        .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, prompt.type == GeckoSession.PromptDelegate.FilePrompt.Type.MULTIPLE)
+                }
                 startActivityForResult(intent, requestFile)
                 return result
             }
@@ -185,11 +189,13 @@ class MainActivity : Activity() {
                 val result = GeckoResult<Int>()
                 val host = runCatching { Uri.parse(tab.url).host }.getOrNull() ?: "this website"
                 runOnUiThread {
-                    AlertDialog.Builder(this@MainActivity).setTitle("Website permission")
+                    val dialog = AlertDialog.Builder(this@MainActivity).setTitle("Website permission")
                         .setMessage("Allow " + host + " to access this permission?")
                         .setPositiveButton("Allow") { _, _ -> result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW) }
                         .setNegativeButton("Block") { _, _ -> result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY) }
-                        .setOnCancelListener { result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY) }.show()
+                        .setOnCancelListener { result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY) }.create()
+                    dialog.setOnShowListener { perm.notifyShown() }
+                    dialog.show()
                 }
                 return result
             }
