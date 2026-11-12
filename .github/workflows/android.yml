@@ -1,8 +1,8 @@
-name: Zorvi Android Prototype APK
+name: Zorvi Android Interim APK (WebView)
 
 on:
   push:
-    branches: [ main, chromium-engine-migration ]
+    branches: [ main, chromium-engine-migration, zorvi-brave-migration ]
     paths:
       - 'app/**'
       - 'gradle/**'
@@ -43,6 +43,6 @@ jobs:
           test "$SIZE" -lt 100000000
       - uses: actions/upload-artifact@v4
         with:
-          name: zorvi-browser-webview-prototype-debug
+          name: zorvi-browser-interim-webview-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
