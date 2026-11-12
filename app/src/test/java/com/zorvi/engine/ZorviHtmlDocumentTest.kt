@@ -193,6 +193,21 @@ class ZorviHtmlDocumentTest {
         assertTrue(document.textContent(document.findFirst("body")!!).contains("text"))
     }
 
+    @Test fun deterministicMalformedMarkupFuzzDoesNotCrash() {
+        val random = kotlin.random.Random(912_2026)
+        val alphabet = "<>/!-'\"=&; abcdef0123456789"
+        repeat(300) {
+            val sample = buildString {
+                repeat(random.nextInt(0, 300)) {
+                    append(alphabet[random.nextInt(alphabet.length)])
+                }
+            }
+            val document = HtmlDocument.parse(sample)
+            assertNotNull(document.root)
+            assertNotNull(document.findFirst("body"))
+        }
+    }
+
     @Test fun malformedInputsDoNotCrashParser() {
         val samples = listOf(
             "<", "<<<<", "<a href='unterminated", "<div><span><p>x</div>",
