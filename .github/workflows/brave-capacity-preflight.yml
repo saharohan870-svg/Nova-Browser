@@ -1,0 +1,53 @@
+name: Zorvi Brave build capacity preflight
+
+on:
+  push:
+    branches: [zorvi-brave-migration]
+    paths:
+      - '.github/workflows/brave-capacity-preflight.yml'
+      - 'docs/BRAVE_ANDROID_MIGRATION.md'
+      - 'docs/AUTH_AND_CODESPACES.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-runner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect runner resources before checkout
+        id: capacity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "## GitHub runner capacity" >> "$GITHUB_STEP_SUMMARY"
+          echo '### CPU' >> "$GITHUB_STEP_SUMMARY"
+          nproc | tee /tmp/cpu
+          echo "- vCPUs: $(cat /tmp/cpu)" >> "$GITHUB_STEP_SUMMARY"
+          echo '### Memory' >> "$GITHUB_STEP_SUMMARY"
+          free -h | tee /tmp/memory
+          MEM_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+          MEM_GB=$((MEM_KB / 1024 / 1024))
+          echo "- Total RAM: approximately ${MEM_GB} GiB" >> "$GITHUB_STEP_SUMMARY"
+          echo '### Disk' >> "$GITHUB_STEP_SUMMARY"
+          df -h "$GITHUB_WORKSPACE" | tee /tmp/disk
+          DISK_KB=$(df -Pk "$GITHUB_WORKSPACE" | awk 'NR==2 {print $4}')
+          DISK_GB=$((DISK_KB / 1024 / 1024))
+          echo "- Available workspace disk: approximately ${DISK_GB} GiB" >> "$GITHUB_STEP_SUMMARY"
+          echo '### Conservative full-build gate' >> "$GITHUB_STEP_SUMMARY"
+          if [ "$MEM_GB" -ge 24 ] && [ "$DISK_GB" -ge 120 ]; then
+            echo "- Result: capacity meets the initial Zorvi preflight threshold." >> "$GITHUB_STEP_SUMMARY"
+            echo "capacity=pass" >> "$GITHUB_OUTPUT"
+          else
+            echo "- Result: **not suitable for a full Brave/Chromium Android build**." >> "$GITHUB_STEP_SUMMARY"
+            echo "- No Brave source was downloaded and no paid runner was selected." >> "$GITHUB_STEP_SUMMARY"
+            echo "capacity=insufficient" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Report decision
+        run: |
+          echo "Preflight result: ${{ steps.capacity.outputs.capacity }}"
+          if [ "${{ steps.capacity.outputs.capacity }}" != "pass" ]; then
+            echo "This runner is for lightweight checks only. Do not start a full Chromium checkout/build here."
+          fi
