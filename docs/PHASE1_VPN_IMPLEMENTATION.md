@@ -1,6 +1,11 @@
 # Phase 1 — Nova VPN implementation plan
 
-Status: **AdGuard selected; blocked on partner approval and SDK/API provisioning; no tunnel is implemented**
+## Current implementation direction (2026-11-12)
+
+The project owner changed the requirement: avoid commercial VPN provider accounts and partner onboarding. Nova now uses the official open-source WireGuard Android tunnel library (`com.wireguard.android:tunnel:1.0.20260102`) instead of the previously selected AdGuard white-label approach. See `docs/NOVA_WIREGUARD_VPN.md` for current implementation and remaining requirements.
+
+
+Status: **WireGuard library integrated in app code; requires a real server profile and CI/device validation**
 
 Branch: `chromium-engine-migration`
 Last reviewed: 2026-11-12
@@ -132,3 +137,8 @@ Phase 1 is complete only when a release build connects to real provider gateways
 
 AdGuard VPN white-label SDK selected by the project owner on 2026-11-12. KeepSolid and WLVPN are no longer active candidates unless AdGuard cannot provide suitable terms or Android integration access.
 
+
+
+## Superseded provider decision
+
+AdGuard was initially selected, but the owner later requested an approach without provider logins or partner accounts. AdGuard white-label onboarding is therefore not the active implementation path. The old AdGuard partner enquiry document is retained as historical research only.
