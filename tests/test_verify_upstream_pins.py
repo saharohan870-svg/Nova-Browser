@@ -70,6 +70,14 @@ class ResolveTagTests(unittest.TestCase):
             MODULE.PINS[2][3],
         ]
         self.assertEqual(MODULE.main(), 1)
+        self.assertEqual(resolve.call_count, len(MODULE.PINS))
+        self.assertEqual(
+            resolve.call_args_list,
+            [
+                unittest.mock.call(pin[1], pin[2])
+                for pin in MODULE.PINS
+            ],
+        )
 
 
 if __name__ == "__main__":
