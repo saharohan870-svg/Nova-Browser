@@ -1,0 +1,102 @@
+name: Brave Android ARM64 source build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# This job deliberately requires a separately provisioned, no-cost self-hosted host.
+# It will remain queued unless a runner with this exact label is online.
+jobs:
+  brave-android-arm64:
+    runs-on: [self-hosted, linux, x64, zorvi-brave-builder]
+    timeout-minutes: 1440
+    env:
+      BRAVE_CORE_SHA: 4d1dfc472152bcc8f3217be190c8a7ad3007039f
+      JAVA_OPTS: -Xmx10G -Xms1G
+    steps:
+      - name: Preflight host before downloading upstream source
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORES="$(nproc)"
+          MEM_BYTES="$(awk '/MemTotal/ {print $2 * 1024}' /proc/meminfo)"
+          FREE_BYTES="$(df -PB1 "$GITHUB_WORKSPACE" | awk 'NR==2 {print $4}')"
+          echo "CPU cores: $CORES"
+          echo "RAM bytes: $MEM_BYTES"
+          echo "Workspace free bytes: $FREE_BYTES"
+          (( CORES >= 8 )) || { echo "::error::Need at least 8 CPU cores"; exit 1; }
+          (( MEM_BYTES >= 34359738368 )) || { echo "::error::Need at least 32 GiB RAM"; exit 1; }
+          (( FREE_BYTES >= 214748364800 )) || { echo "::error::Need at least 200 GiB free workspace disk"; exit 1; }
+          command -v git
+          command -v python3
+
+      - uses: actions/checkout@v4
+
+      - name: Verify immutable upstream refs
+        run: python3 scripts/verify_upstream_pins.py
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.11.0 --activate
+          pnpm --version
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Checkout Brave core at the pinned release
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/engine/src"
+          git clone https://github.com/brave/brave-core.git "$GITHUB_WORKSPACE/engine/src/brave"
+          git -C "$GITHUB_WORKSPACE/engine/src/brave" checkout --detach "$BRAVE_CORE_SHA"
+          test "$(git -C "$GITHUB_WORKSPACE/engine/src/brave" rev-parse HEAD)" = "$BRAVE_CORE_SHA"
+
+      - name: Synchronize Chromium and Brave Android dependencies
+        working-directory: engine/src/brave
+        run: pnpm run init --target_os=android --target_arch=arm
+
+      - name: Install Chromium Android system dependencies
+        working-directory: engine/src
+        run: ./build/install-build-deps.sh --android
+
+      - name: Build real Brave Chromium Android APK
+        working-directory: engine/src/brave
+        run: pnpm run build Debug --target_os=android --target_arch=arm --target_android_output_format=apk
+
+      - name: Record exact synchronized source revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/engine-artifacts"
+          {
+            echo "brave_core_sha=$(git -C engine/src/brave rev-parse HEAD)"
+            echo "chromium_src_sha=$(git -C engine/src rev-parse HEAD)"
+            echo "chromium_src_tag=157.0.8103.50 (release tag reference; synced SHA above is authoritative)"
+          } | tee "$GITHUB_WORKSPACE/engine-artifacts/source-revisions.txt"
+          APK="$(find engine/src/out/android_Debug_arm/apks -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          test -n "$APK"
+          cp "$APK" "$GITHUB_WORKSPACE/engine-artifacts/"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zorvi-upstream-brave-arm64-debug
+          path: engine-artifacts/
+          if-no-files-found: error
+          retention-days: 7
