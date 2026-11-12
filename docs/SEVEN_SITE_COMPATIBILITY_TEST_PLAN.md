@@ -56,6 +56,42 @@ For each AI site:
 
 For other major sites, run the site-specific checks in the tables above. YouTube requires an actual video playback/fullscreen check. WhatsApp QR codes and linked-device details must never be captured in screenshots or shared.
 
+## Phase 4 execution record
+
+Device testing cannot be performed by GitHub Actions: the workflow builds the APK and runs JVM tests, but it does not launch GeckoView on a physical Android device. Keep every result as **Not run** until a human completes the checks on-device. Do not mark a site as passing based only on an HTTP response or a successful APK build.
+
+| Target | Load | Sign-in | Core feature | Upload/media | Desktop mode | Result |
+|---|---|---|---|---|---|---|
+| ChatGPT | Not run | Not run | Not run | Not run | Not run | Not run |
+| Claude | Not run | Not run | Not run | Not run | Not run | Not run |
+| Google Gemini | Not run | Not run | Not run | Not run | Not run | Not run |
+| Microsoft Copilot | Not run | Not run | Not run | Not run | Not run | Not run |
+| Perplexity | Not run | Not run | Not run | Not run | Not run | Not run |
+| Grok | Not run | Not run | Not run | Not run | Not run | Not run |
+| DeepSeek | Not run | Not run | Not run | Not run | Not run | Not run |
+| Mistral Le Chat | Not run | Not run | Not run | Not run | Not run | Not run |
+| Meta AI | Not run | Not run | Not run | Not run | Not run | Not run |
+| Google Search | Not run | Not run | Not run | N/A | Not run | Not run |
+| YouTube | Not run | Not run | Not run | Not run | Not run | Not run |
+| GitHub | Not run | Not run | Not run | Not run | Not run | Not run |
+| Instagram | Not run | Not run | Not run | Not run | Not run | Not run |
+| Discord | Not run | Not run | Not run | Not run | Not run | Not run |
+| WhatsApp Web | Not run | Not run | Not run | N/A | Not run | Not run |
+| Microsoft 365 | Not run | Not run | Not run | Not run | Not run | Not run |
+
+### Required device record
+
+Record these fields with each test session: APK version/commit, GeckoView version, Android version, device model, date/time, network type, and notes for failed steps. Never include credentials, OTPs, QR codes, private conversations, or private files.
+
+### Additional browser regression checks
+
+- [ ] Open an authenticated download and verify the file contents and final filename.
+- [ ] Interrupt a download, resume where supported, and confirm final integrity.
+- [ ] Verify download progress/status and delete behavior from Nova's Downloads screen.
+- [ ] Create, rename, switch, and delete a tab group; verify deleting a group moves its tabs to General.
+- [ ] Move a tab between groups and restart the app; verify groups and tab membership persist.
+- [ ] Confirm private tabs do not appear in normal groups or restored sessions.
+
 ## Result labels
 
 - **Pass:** all listed checks succeed on the target device.
