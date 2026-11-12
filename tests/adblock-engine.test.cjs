@@ -46,7 +46,7 @@ function blocked(c, url, type = "script", party = "news.example") {
 {
   const c = compile("||important.example^$important\n@@||important.example^");
   assert.equal(blocked(c, "https://important.example/ad.js"), true, "important block survives exception");
-  const reversed = compile("@@||important.example^\\n||important.example^$important");
+  const reversed = compile("@@||important.example^\n||important.example^$important");
   assert.equal(blocked(reversed, "https://important.example/ad.js"), true, "important block wins even when exception appears first");
 }
 console.log("Nova AdBlock engine tests passed: 7 groups");
