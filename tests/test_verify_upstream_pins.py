@@ -52,5 +52,25 @@ class ResolveTagTests(unittest.TestCase):
             MODULE.resolve_tag("https://example.invalid/repo.git", "v1")
 
 
+    @patch.object(MODULE, "resolve_tag")
+    def test_main_succeeds_when_all_pins_match(self, resolve):
+        resolve.side_effect = [pin[3] for pin in MODULE.PINS]
+        self.assertEqual(MODULE.main(), 0)
+
+    @patch.object(MODULE, "resolve_tag")
+    def test_main_fails_when_a_pin_changes(self, resolve):
+        resolve.side_effect = [MODULE.PINS[0][3], "changed-commit", MODULE.PINS[2][3]]
+        self.assertEqual(MODULE.main(), 1)
+
+    @patch.object(MODULE, "resolve_tag")
+    def test_main_continues_after_upstream_query_error(self, resolve):
+        resolve.side_effect = [
+            subprocess.TimeoutExpired("git ls-remote", 60),
+            MODULE.PINS[1][3],
+            MODULE.PINS[2][3],
+        ]
+        self.assertEqual(MODULE.main(), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
