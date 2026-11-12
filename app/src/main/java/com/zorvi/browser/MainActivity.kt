@@ -5,6 +5,7 @@ import android.app.DownloadManager
 import android.app.PictureInPictureParams
 import android.app.AlertDialog
 import android.content.Context
+import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -13,6 +14,10 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.Build
 import android.util.Rational
+import android.provider.MediaStore
+import java.io.File
+import java.io.FileOutputStream
+import java.io.InputStream
 import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -135,7 +140,7 @@ class MainActivity : Activity() {
         val tab = Tab(session, view, private = privateMode, group = if (privateMode) "Private" else (prefs.getString("active_group", "General") ?: "General"))
         session.setContentDelegate(object : GeckoSession.ContentDelegate {
             override fun onExternalResponse(session: GeckoSession, response: org.mozilla.geckoview.WebResponse) {
-                runOnUiThread { queueDownload(response.uri, response.headers["content-disposition"], response.headers["content-type"]) }
+                runOnUiThread { queueDownload(response.uri, response.headers["content-disposition"], response.headers["content-type"], response.body) }
             }
             override fun onFullScreen(session: GeckoSession, fullScreen: Boolean) {
                 runOnUiThread { setBrowserFullScreen(fullScreen) }
@@ -331,20 +336,51 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun queueDownload(url: String, disposition: String?, mime: String?) {
-        if (!url.startsWith("https://") && !url.startsWith("http://")) return
+    private fun queueDownload(url: String, disposition: String?, mime: String?, body: InputStream?) {
+        if (!url.startsWith("https://") && !url.startsWith("http://")) { body?.close(); return }
         val headerName = disposition?.substringAfter("filename=", "")?.trim('"')?.takeIf { it.isNotBlank() }
         val rawName = headerName ?: Uri.parse(url).lastPathSegment ?: "download"
         val name = rawName.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_").take(120).ifBlank { "download" }
-        runCatching {
-            val request = DownloadManager.Request(Uri.parse(url)).setTitle(name)
-                .setDescription("Downloading with Nova Browser")
-                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name)
-            if (!mime.isNullOrBlank()) request.setMimeType(mime.substringBefore(';'))
-            (getSystemService(DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
-            Toast.makeText(this, "Download started: " + name, Toast.LENGTH_LONG).show()
-        }.onFailure { Toast.makeText(this, "Download failed: " + it.message, Toast.LENGTH_LONG).show() }
+        if (body == null) {
+            runCatching {
+                val request = DownloadManager.Request(Uri.parse(url)).setTitle(name)
+                    .setDescription("Downloading with Nova Browser")
+                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name)
+                if (!mime.isNullOrBlank()) request.setMimeType(mime.substringBefore(';'))
+                (getSystemService(DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
+                Toast.makeText(this, "Download queued: " + name, Toast.LENGTH_LONG).show()
+            }.onFailure { Toast.makeText(this, "Download failed: " + it.message, Toast.LENGTH_LONG).show() }
+            return
+        }
+        Thread {
+            var destination: Uri? = null
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Downloads.DISPLAY_NAME, name)
+                        put(MediaStore.Downloads.MIME_TYPE, mime?.substringBefore(';') ?: "application/octet-stream")
+                        put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                        put(MediaStore.Downloads.IS_PENDING, 1)
+                    }
+                    destination = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                        ?: throw IllegalStateException("Could not create Downloads entry")
+                    contentResolver.openOutputStream(destination!!)?.use { output -> body.use { it.copyTo(output) } }
+                        ?: throw IllegalStateException("Could not open Downloads output")
+                    val complete = ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }
+                    contentResolver.update(destination!!, complete, null, null)
+                } else {
+                    val directory = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir
+                    val file = File(directory, name)
+                    FileOutputStream(file).use { output -> body.use { it.copyTo(output) } }
+                }
+                runOnUiThread { Toast.makeText(this, "Downloaded: " + name, Toast.LENGTH_LONG).show() }
+            } catch (error: Exception) {
+                body.close()
+                if (destination != null) contentResolver.delete(destination!!, null, null)
+                runOnUiThread { Toast.makeText(this, "Download failed: " + error.message, Toast.LENGTH_LONG).show() }
+            }
+        }.start()
     }
 
     private fun showDownloads() {
