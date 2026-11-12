@@ -156,6 +156,13 @@ class ZorviHtmlDocumentTest {
         assertTrue(document.visibleBlocks().any { it.text == "After" })
     }
 
+    @Test fun reportsWhenParserNestingLimitIsReached() {
+        val source = "<div>".repeat(300) + "text"
+        val document = HtmlDocument.parse(source)
+        assertTrue(document.nestingLimitReached)
+        assertTrue(document.textContent(document.findFirst("body")!!).contains("text"))
+    }
+
     @Test fun malformedInputsDoNotCrashParser() {
         val samples = listOf(
             "<", "<<<<", "<a href='unterminated", "<div><span><p>x</div>",
