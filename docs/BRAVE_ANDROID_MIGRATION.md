@@ -89,7 +89,7 @@ Do not attempt to download or compile the full Brave/Chromium source on the stan
 - [x] Migration decision recorded.
 - [x] Dedicated migration branch created from the existing experimental-engine branch.
 - [ ] Find and verify a genuinely no-cost Linux build host with sufficient persistent resources.
-- [ ] Pin upstream Brave/Chromium revisions.
+- [x] Select a stable Brave/Chromium baseline (immutable commit and DEPS hashes still need resolution).
 - [ ] Build unmodified upstream ARM64 Android APK.
 - [ ] Apply Zorvi branding.
 - [ ] Port and verify requested Zorvi features.
