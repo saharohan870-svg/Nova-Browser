@@ -26,6 +26,13 @@ class ZorviHtmlDocumentTest {
         assertEquals("Tom & Jerry 😀", paragraph.children.single().text)
     }
 
+    @Test fun keepsContentAfterExplicitBodyAndHtmlEndTagsInBody() {
+        val document = HtmlDocument.parse("<html><body><p>Before</p></body></html><p>After</p>")
+        val body = document.findFirst("body")!!
+        assertEquals(2, body.children.count { it.tag == "p" })
+        assertEquals("After", document.textContent(body.children.last()))
+    }
+
     @Test fun handlesCommentsVoidElementsAndMalformedClosingTags() {
         val document = HtmlDocument.parse("<p>One<br>Two<!-- hidden --><img src=x></p></oops>")
         val paragraph = document.findFirst("p")
