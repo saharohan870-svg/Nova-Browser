@@ -21,7 +21,7 @@ An Android browser prototype with a Chrome-inspired interface, powered by Mozill
 - Native page-text extraction for summaries, sent to a selected online AI provider
 - Reader mode with extracted text, font-size and theme controls
 - On-device translation for supported Google ML Kit language pairs after model download
-- Bundled GeckoView WebExtension for request-level blocking of a conservative curated set of ad/tracker domains, plus basic cosmetic hiding
+- Bundled GeckoView ad-blocking WebExtension with EasyList and EasyPrivacy subscriptions, ABP-style network rules, domain/type/third-party options, exceptions, cosmetic selectors and automatic daily list refresh
 - User-managed domain navigation blocklist and GeckoView tracking protection
 - Local history/bookmark/tab-restore cleanup
 - Page-crash recovery actions and low-memory session handling
@@ -37,4 +37,4 @@ Open this repository in Android Studio, allow Gradle sync, then run the `app` co
 
 ## Known limitations
 
-This is not a full Chromium distribution. GeckoView is a separate Firefox/Gecko engine; it does not guarantee identical Chromium behavior or every site's support. The experimental Zorvi renderer is not standards-complete and is not intended for modern AI web apps. The bundled blocker uses a small curated host list—not EasyList/uBlock filter syntax—and is not a comprehensive ad blocker. Cosmetic selectors are intentionally conservative and may miss ads or hide some site elements.
+This is not a full Chromium distribution. GeckoView is a separate Firefox/Gecko engine; it does not guarantee identical Chromium behavior or every site's support. The experimental Zorvi renderer is not standards-complete and is not intended for modern AI web apps. The bundled blocker implements a practical subset of Adblock Plus filter syntax for EasyList/EasyPrivacy. It does not yet support every uBlock Origin/ABP advanced feature (such as procedural cosmetic rules, redirects, scriptlets, CSP and all modifiers), so it is not feature-equivalent to uBlock Origin. Some site-specific ads may remain.
