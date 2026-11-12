@@ -39,3 +39,9 @@ Required tests:
 - VPN provider/backend: **not selected or configured**.
 - Tor runtime and GeckoView routing integration: **not implemented**.
 - No VPN/Tor security claim may be made until the leak and routing tests above pass on a physical device.
+
+## Implementation research notes
+- Guardian Project's maintained `tor-android` library provides an Android TorService and native Tor binaries, but the sample integration demonstrates an Android WebView path, not GeckoView routing. It cannot be treated as an automatic drop-in for this browser.
+- GeckoView does not expose a supported public app API for configuring a proxy. A GeckoView issue records Mozilla's guidance to use internal configuration mechanisms, which are not a supported production proxy contract. Therefore, simply starting Tor on localhost:9050 and setting a UI flag would not establish a safe Guest Mode Tor route.
+- Nova must use a verified routing layer that covers GeckoView's full network stack, DNS and WebRTC, and fails closed. A separate HTTP fetch interceptor is not sufficient for a full browser session.
+- Research references: Guardian Project tor-android README (https://github.com/guardianproject/tor-android); Mozilla GeckoView proxy discussion (https://github.com/mozilla/geckoview/issues/206); Tor Project mobile guidance (https://support.torproject.org/tormobile/).
