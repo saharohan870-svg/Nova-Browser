@@ -28,6 +28,11 @@ import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.GeckoSessionSettings
 import org.mozilla.geckoview.GeckoView
+import org.mozilla.geckoview.AllowOrDeny
+import com.google.mlkit.nl.languageid.LanguageIdentification
+import com.google.mlkit.nl.translate.TranslateLanguage
+import com.google.mlkit.nl.translate.Translation
+import com.google.mlkit.nl.translate.TranslatorOptions
 import java.net.URLEncoder
 import java.util.Locale
 
@@ -120,6 +125,7 @@ class MainActivity : Activity() {
         controls.addView(button("Tools") { showAdvancedTools() })
         controls.addView(button("Shield") { showPrivacyControls() })
         controls.addView(button("Permissions") { showPermissionDashboard() })
+        controls.addView(button("Blocklist") { manageBlockedDomains() })
         controls.addView(button("Group") { manageGroups() })
         controls.addView(button("Downloads") { showDownloads() })
         controls.addView(button("PiP") { enterPip() })
@@ -167,7 +173,7 @@ class MainActivity : Activity() {
             when (which) {
                 0 -> askAiAssistant()
                 1 -> summarizeCurrentPage()
-                2 -> translateCurrentPage()
+                2 -> translateCurrentPageOffline()
                 3 -> chooseTranslationLanguage()
                 4 -> openReaderView()
                 5 -> customizeHomePage()
@@ -196,12 +202,124 @@ class MainActivity : Activity() {
     }
 
     private fun summarizeCurrentPage() {
-        val url = current()?.url.orEmpty()
+        val tab = current() ?: return
+        val url = tab.url
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
             Toast.makeText(this, "Open a webpage first", Toast.LENGTH_SHORT).show(); return
         }
-        val prompt = "Please open and summarize this webpage. If you cannot access it, tell me: $url"
-        chooseAiProvider(prompt, "Summarize with")
+        Toast.makeText(this, "Extracting page text…", Toast.LENGTH_SHORT).show()
+        tab.session.sessionPageExtractor.pageContent.then { content ->
+            val excerpt = content.orEmpty().take(9000)
+            runOnUiThread {
+                if (excerpt.isBlank()) Toast.makeText(this, "Could not extract readable page text", Toast.LENGTH_LONG).show()
+                else chooseAiProvider("Summarize this page using the extracted content.\nURL: $url\n\nPAGE CONTENT:\n$excerpt", "Summarize with")
+            }
+            null
+        }.exceptionally { error ->
+            runOnUiThread { Toast.makeText(this, "Page extraction failed: " + (error.message ?: "unknown error"), Toast.LENGTH_LONG).show() }
+            null
+        }
+    }
+
+    private fun showReaderContent(title: String, content: String) {
+        val text = TextView(this).apply {
+            text = content
+            textSize = prefs.getInt("reader_text_size", 17).coerceIn(12, 28).toFloat()
+            val night = prefs.getBoolean("reader_dark", false)
+            setTextColor(if (night) Color.WHITE else Color.BLACK)
+            setBackgroundColor(if (night) Color.rgb(28, 28, 28) else Color.WHITE)
+            setPadding(24, 20, 24, 24)
+        }
+        val scroll = ScrollView(this).apply { addView(text) }
+        val controls = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(button("A−") {
+                val size = (prefs.getInt("reader_text_size", 17) - 1).coerceAtLeast(12)
+                prefs.edit().putInt("reader_text_size", size).apply(); text.textSize = size.toFloat()
+            })
+            addView(button("A+") {
+                val size = (prefs.getInt("reader_text_size", 17) + 1).coerceAtMost(28)
+                prefs.edit().putInt("reader_text_size", size).apply(); text.textSize = size.toFloat()
+            })
+            addView(button("Theme") {
+                val night = !prefs.getBoolean("reader_dark", false)
+                prefs.edit().putBoolean("reader_dark", night).apply()
+                text.setTextColor(if (night) Color.WHITE else Color.BLACK)
+                text.setBackgroundColor(if (night) Color.rgb(28, 28, 28) else Color.WHITE)
+            })
+        }
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(controls)
+            addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        }
+        AlertDialog.Builder(this).setTitle(title).setView(layout).setPositiveButton("Done", null).show()
+    }
+
+    private fun openReaderView() {
+        val tab = current() ?: return
+        if (!tab.url.startsWith("http://") && !tab.url.startsWith("https://")) {
+            Toast.makeText(this, "Open an article first", Toast.LENGTH_SHORT).show(); return
+        }
+        tab.session.sessionPageExtractor.pageContent.then { content ->
+            runOnUiThread {
+                val article = content.orEmpty()
+                if (article.isBlank()) Toast.makeText(this, "No readable article text found", Toast.LENGTH_LONG).show()
+                else showReaderContent(tab.title.ifBlank { "Reader view" }, article)
+            }
+            null
+        }.exceptionally { error ->
+            runOnUiThread { Toast.makeText(this, "Reader extraction failed: " + error.message, Toast.LENGTH_LONG).show() }
+            null
+        }
+    }
+
+    private fun translateCurrentPageOffline() {
+        val tab = current() ?: return
+        if (!tab.url.startsWith("http://") && !tab.url.startsWith("https://")) {
+            Toast.makeText(this, "Open a webpage first", Toast.LENGTH_SHORT).show(); return
+        }
+        val target = prefs.getString("translation_language", "en") ?: "en"
+        val targetCode = if (target == "zh-CN") TranslateLanguage.CHINESE else target
+        if (targetCode == "as") {
+            Toast.makeText(this, "Assamese is not available offline; using online translation.", Toast.LENGTH_LONG).show()
+            translateCurrentPage(); return
+        }
+        Toast.makeText(this, "Extracting page text…", Toast.LENGTH_SHORT).show()
+        tab.session.sessionPageExtractor.pageContent.then { content ->
+            val pageText = content.orEmpty().take(12000)
+            if (pageText.isBlank()) {
+                runOnUiThread { Toast.makeText(this, "No readable text found", Toast.LENGTH_LONG).show() }
+            } else {
+                LanguageIdentification.getClient().identifyLanguage(pageText.take(3000))
+                    .addOnSuccessListener { source ->
+                        if (source == "und") {
+                            runOnUiThread { Toast.makeText(this, "Could not identify source language", Toast.LENGTH_LONG).show() }
+                        } else {
+                            val options = TranslatorOptions.Builder().setSourceLanguage(source).setTargetLanguage(targetCode).build()
+                            val translator = Translation.getClient(options)
+                            translator.downloadModelIfNeeded().addOnSuccessListener {
+                                translator.translate(pageText).addOnSuccessListener { translated ->
+                                    runOnUiThread { showReaderContent("Offline translation", translated) }
+                                    translator.close()
+                                }.addOnFailureListener { error ->
+                                    translator.close()
+                                    runOnUiThread { Toast.makeText(this, "Translation failed: " + error.message, Toast.LENGTH_LONG).show() }
+                                }
+                            }.addOnFailureListener {
+                                translator.close()
+                                runOnUiThread { Toast.makeText(this, "Could not download language model. Connect once to download it.", Toast.LENGTH_LONG).show() }
+                            }
+                        }
+                    }.addOnFailureListener { error ->
+                        runOnUiThread { Toast.makeText(this, "Language detection failed: " + error.message, Toast.LENGTH_LONG).show() }
+                    }
+            }
+            null
+        }.exceptionally { error ->
+            runOnUiThread { Toast.makeText(this, "Page extraction failed: " + error.message, Toast.LENGTH_LONG).show() }
+            null
+        }
     }
 
     private fun translateCurrentPage() {
@@ -225,12 +343,36 @@ class MainActivity : Activity() {
             }.setNegativeButton("Cancel", null).show()
     }
 
-    private fun openReaderView() {
-        val url = current()?.url.orEmpty()
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            Toast.makeText(this, "Open an article first", Toast.LENGTH_SHORT).show(); return
-        }
-        current()?.session?.loadUri("about:reader?url=" + URLEncoder.encode(url, "UTF-8"))
+
+
+    private fun blockedDomains(): Set<String> = prefs.getStringSet("blocked_domains", emptySet())?.toSet() ?: emptySet()
+
+    private fun isDomainBlocked(url: String): Boolean {
+        val host = runCatching { Uri.parse(url).host?.lowercase(Locale.ROOT) }.getOrNull() ?: return false
+        return blockedDomains().any { host == it || host.endsWith("." + it) }
+    }
+
+    private fun manageBlockedDomains() {
+        val field = EditText(this).apply { hint = "ads.example.com"; isSingleLine = true }
+        val existing = blockedDomains().sorted()
+        AlertDialog.Builder(this).setTitle("Domain blocklist")
+            .setMessage("Blocks matching page and iframe navigations. GeckoView tracking protection also blocks known trackers. This is not a full network-level ad filter.")
+            .setView(field)
+            .setPositiveButton("Add domain") { _, _ ->
+                val host = field.text.toString().trim().lowercase(Locale.ROOT).removePrefix("https://").removePrefix("http://").substringBefore("/").substringBefore(":")
+                if (host.contains(".") && host.matches(Regex("^[a-z0-9.-]+[.][a-z]{2,}$"))) {
+                    val updated = blockedDomains().toMutableSet().apply { add(host) }
+                    prefs.edit().putStringSet("blocked_domains", updated).apply()
+                    Toast.makeText(this, "Added " + host, Toast.LENGTH_SHORT).show()
+                } else Toast.makeText(this, "Enter a valid domain", Toast.LENGTH_SHORT).show()
+            }
+            .setNeutralButton("Manage") { _, _ ->
+                if (existing.isEmpty()) Toast.makeText(this, "Blocklist is empty", Toast.LENGTH_SHORT).show()
+                else AlertDialog.Builder(this).setTitle("Blocked domains").setItems(existing.toTypedArray()) { _, which ->
+                    val updated = blockedDomains().toMutableSet().apply { remove(existing[which]) }
+                    prefs.edit().putStringSet("blocked_domains", updated).apply()
+                }.setNegativeButton("Close", null).show()
+            }.setNegativeButton("Close", null).show()
     }
 
     private fun showPermissionDashboard() {
@@ -316,6 +458,12 @@ class MainActivity : Activity() {
             }
         })
         session.setNavigationDelegate(object : GeckoSession.NavigationDelegate {
+            override fun onLoadRequest(session: GeckoSession, request: GeckoSession.NavigationDelegate.LoadRequest): GeckoResult<AllowOrDeny>? {
+                return if (isDomainBlocked(request.uri)) GeckoResult.deny() else null
+            }
+            override fun onSubframeLoadRequest(session: GeckoSession, request: GeckoSession.NavigationDelegate.LoadRequest): GeckoResult<AllowOrDeny>? {
+                return if (isDomainBlocked(request.uri)) GeckoResult.deny() else null
+            }
             override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) { tab.canGoBack = canGoBack }
             override fun onCanGoForward(session: GeckoSession, canGoForward: Boolean) { tab.canGoForward = canGoForward }
             override fun onNewSession(session: GeckoSession, uri: String): GeckoResult<GeckoSession> {
