@@ -119,7 +119,7 @@ internal data class HtmlDocument(
                             value = sourceTag.substring(valueStart, i)
                         }
                     }
-                    if (name.isNotEmpty() && name !in result) result[name] = decodeEntities(value)
+                    if (name.isNotEmpty() && name !in result) result[name] = decodeEntities(value, inAttribute = true)
                 }
                 return result
             }
@@ -292,7 +292,7 @@ internal data class HtmlDocument(
             return -1
         }
 
-        private fun decodeEntities(value: String): String {
+        private fun decodeEntities(value: String, inAttribute: Boolean = false): String {
             val named = mapOf(
                 "amp" to "&", "lt" to "<", "gt" to ">", "quot" to "\"", "apos" to "'",
                 "nbsp" to "\u00A0", "copy" to "©", "reg" to "®", "trade" to "™",
@@ -313,7 +313,11 @@ internal data class HtmlDocument(
                 when {
                     key.startsWith("#x", true) -> key.drop(2).toIntOrNull(16)?.let(::codePoint) ?: "\uFFFD"
                     key.startsWith("#") -> key.drop(1).toIntOrNull()?.let(::codePoint) ?: "\uFFFD"
-                    named.containsKey(key) && (raw.endsWith(";") || key in legacyNoSemicolon) -> named.getValue(key)
+                    named.containsKey(key) && (raw.endsWith(";") || (
+                        key in legacyNoSemicolon &&
+                            (!inAttribute || match.range.last + 1 >= value.length ||
+                                (!value[match.range.last + 1].isLetterOrDigit() && value[match.range.last + 1] != '='))
+                    )) -> named.getValue(key)
                     else -> match.value
                 }
             }
