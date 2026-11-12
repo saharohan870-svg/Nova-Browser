@@ -78,19 +78,18 @@ The security, account-linking, Codespace lifecycle, privacy boundaries and imple
 
 ## Free-only build strategy
 
-The project must not incur charges without explicit approval. The repository's standard GitHub-hosted runner can build the lightweight Android WebView interim app, run its tests and publish a clearly labelled debug APK artifact. It cannot be treated as a Brave/Chromium source-build machine: the full upstream checkout and Android build need substantially more persistent disk and memory than this runner provides.
+The project must not incur charges without explicit approval. The standard GitHub-hosted runner remains limited to the clearly labelled interim WebView prototype. A separate manual-only workflow, `.github/workflows/brave-android-source.yml`, now defines the real Brave/Chromium Android source build. It accepts only a self-hosted Linux x86-64 runner with the exact `zorvi-brave-builder` label and checks for at least 8 CPU cores, 32 GiB RAM and 200 GiB free workspace disk before downloading upstream source. It checks out the pinned Brave core release, runs Brave's Android sync/build commands, and records the exact synchronized Chromium source SHA alongside the APK.
 
-The existing `.github/workflows/android.yml` is therefore enabled on this migration branch and explicitly labels its artifact as an **interim WebView build**, not Brave. This gives us a free, testable Android shell while the real engine migration is prepared.
-
-Do not attempt to download or compile the full Brave/Chromium source on the standard runner, silently switch to a paid runner, or publish the interim APK as a Brave-powered browser. A true Brave APK still requires a suitable build host. Possible no-cost routes can be evaluated separately, but only a verified host with adequate resources and no billing requirement may be used.
+No self-hosted builder has been provisioned or connected yet. Therefore the workflow is a real source-build pipeline definition, not evidence that a Brave APK has already been built. It must remain dormant until a genuinely no-cost qualifying host is available. Do not enable a paid runner or incur Codespaces/cloud charges without explicit approval. Never publish the interim WebView APK as a Brave-powered browser.
 
 ## Current status
 
 - [x] Migration decision recorded.
 - [x] Dedicated migration branch created from the existing experimental-engine branch.
+- [x] Define a manual-only Brave Android source-build workflow gated to a qualifying self-hosted Linux builder.
 - [ ] Find and verify a genuinely no-cost Linux build host with sufficient persistent resources.
 - [x] Select a stable Brave/Chromium baseline (immutable commit and DEPS hashes still need resolution).
-- [ ] Build unmodified upstream ARM64 Android APK.
+- [ ] Build unmodified upstream Brave Android APK and record the actual synchronized Chromium SHA.
 - [ ] Apply Zorvi branding.
 - [ ] Port and verify requested Zorvi features.
 - [ ] Release and publish.
