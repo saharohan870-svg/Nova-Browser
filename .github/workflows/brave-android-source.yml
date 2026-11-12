@@ -109,12 +109,3 @@ jobs:
           path: engine-artifacts/
           if-no-files-found: error
           retention-days: 7
- || {
-            echo "::error::APK does not contain ARM64 native libraries"
-            exit 1
-          }
-          cp "$APK" "$GITHUB_WORKSPACE/engine-artifacts/"
-          (
-            cd "$GITHUB_WORKSPACE/engine-artifacts"
-            sha256sum "$(basename "$APK")" | tee apk-sha256.txt
-          )
