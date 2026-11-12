@@ -38,7 +38,7 @@ function blocked(c, url, type = "script", party = "news.example") {
   assert.equal(blocked(c, "https://ads.example/a.js", "script", "shop.example"), false);
 }
 {
-  const c = compile("news.example##.sponsored, #ad-slot\nnews.example#@#.sponsored");
+  const c = compile("news.example##.sponsored\nnews.example###ad-slot\nnews.example#@#.sponsored");
   const selectors = engine.cosmetic(c, "news.example");
   assert.ok(selectors.includes("#ad-slot"));
   assert.ok(!selectors.includes(".sponsored"), "cosmetic exception removes selector");
