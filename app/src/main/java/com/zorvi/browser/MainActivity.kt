@@ -24,6 +24,9 @@ import android.widget.*
 import android.app.AlertDialog
 import android.database.Cursor
 import org.json.JSONArray
+import androidx.webkit.ProfileStore
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import java.io.ByteArrayInputStream
 import java.net.URLEncoder
 import java.util.Locale
@@ -119,6 +122,13 @@ class MainActivity : Activity() {
 
     private fun newTab(url: String = "about:blank") {
         val web = WebView(this)
+        if (privateMode) {
+            // Fail closed: never use the default profile for a private tab.
+            check(WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
+                "This Android System WebView does not support isolated profiles"
+            }
+            WebViewCompat.setProfile(web, PRIVATE_PROFILE_NAME)
+        }
         web.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -134,7 +144,12 @@ class MainActivity : Activity() {
             if (privateMode) cacheMode = WebSettings.LOAD_NO_CACHE
         }
         if (privateMode) privateTabs.add(web)
-        CookieManager.getInstance().setAcceptThirdPartyCookies(web, !privateMode)
+        val cookieManager = if (privateMode) {
+            ProfileStore.getInstance().getOrCreateProfile(PRIVATE_PROFILE_NAME).cookieManager
+        } else {
+            CookieManager.getInstance()
+        }
+        cookieManager.setAcceptThirdPartyCookies(web, !privateMode)
 
         web.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
@@ -309,35 +324,36 @@ class MainActivity : Activity() {
             return
         }
         pages.removeAt(active)
-        if (removed in privateTabs) {
-            privateTabs.remove(removed)
-            clearPrivateWebView(removed)
-        }
+        val wasPrivate = removed in privateTabs
+        if (wasPrivate) privateTabs.remove(removed)
         removed.stopLoading()
         removed.loadUrl("about:blank")
         removed.clearHistory()
         removed.clearCache(true)
         removed.destroy()
+        if (wasPrivate && privateTabs.isEmpty()) clearPrivateProfileData()
         active = active.coerceAtMost(pages.lastIndex)
         showOnlyActive()
         updateTabs()
     }
 
-    private fun clearPrivateWebView(web: WebView) {
-        web.clearHistory()
-        web.clearCache(true)
-        web.clearFormData()
-        web.loadUrl("about:blank")
-        // WebView's CookieManager is process-wide; this prototype cannot safely isolate private cookies.
+    private fun clearPrivateProfileData() {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) return
+        runCatching {
+            val profile = ProfileStore.getInstance().getOrCreateProfile(PRIVATE_PROFILE_NAME)
+            profile.cookieManager.removeAllCookies(null)
+            profile.cookieManager.flush()
+            profile.webStorage.deleteAllData()
+        }
     }
 
     private fun togglePrivate() {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
+            Toast.makeText(this, "Private browsing is unavailable: update Android System WebView to a version with multi-profile support.", Toast.LENGTH_LONG).show()
+            return
+        }
         privateMode = !privateMode
-        Toast.makeText(
-            this,
-            if (privateMode) "Limited private tab: history is not saved, but cookies are not isolated." else "Private mode off",
-            Toast.LENGTH_LONG
-        ).show()
+        Toast.makeText(this, if (privateMode) "Isolated private profile enabled. Data is cleared when its last tab closes." else "Private mode off", Toast.LENGTH_SHORT).show()
         newTab("about:blank")
     }
 
@@ -427,6 +443,7 @@ class MainActivity : Activity() {
 
     companion object {
         private const val FILE_PICKER_REQUEST = 4102
+        private const val PRIVATE_PROFILE_NAME = "zorvi_ephemeral_private"
         private val blockedHosts = setOf(
             "doubleclick.net", "googlesyndication.com", "adservice.google.com",
             "adnxs.com", "ads.yahoo.com", "scorecardresearch.com",
