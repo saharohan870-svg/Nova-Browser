@@ -100,6 +100,24 @@ class ZorviHtmlDocumentTest {
         assertEquals(1, rows[1].children.count { it.tag == "td" })
     }
 
+
+    @Test fun preservesOuterListItemWhenNestedListStarts() {
+        val document = HtmlDocument.parse("<ul><li>Outer<ul><li>Inner</li></ul></li><li>Second</li></ul>")
+        val list = document.findFirst("ul")!!
+        assertEquals(2, list.children.count { it.tag == "li" })
+        val outer = list.children.first { it.tag == "li" }
+        assertEquals(1, outer.children.count { it.tag == "ul" })
+        assertEquals("Inner", document.textContent(outer.children.single { it.tag == "ul" }.children.single { it.tag == "li" }))
+    }
+
+    @Test fun preservesOuterTableCellWhenNestedTableStarts() {
+        val document = HtmlDocument.parse("<table><tr><td>Outer<table><tr><td>Inner</table>Tail</td></tr></table>")
+        val outerCell = document.findFirst("td")!!
+        assertTrue(document.textContent(outerCell).contains("Outer"))
+        assertTrue(document.textContent(outerCell).contains("Tail"))
+        assertEquals("Inner", document.textContent(document.findAll("td")[1]))
+    }
+
     @Test fun decodesCommonNamedAndWindows1252NumericReferences() {
         val document = HtmlDocument.parse("<p>&euro; &mdash; &hellip; &#x80; &#128;</p>")
         assertEquals("€ — … € €", document.textContent(document.findFirst("p")!!))
