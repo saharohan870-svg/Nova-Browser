@@ -41,7 +41,7 @@ import java.util.Locale
  * Each tab owns one GeckoSession; private tabs use Gecko's private-mode session setting.
  */
 class MainActivity : Activity() {
-    private data class Tab(val session: GeckoSession, val view: GeckoView, var url: String = "", var title: String = "", val private: Boolean = false, var group: String = "General", var serializedState: String? = null, var canGoBack: Boolean = false, var canGoForward: Boolean = false, var pinned: Boolean = false)
+    private data class Tab(val session: GeckoSession, val view: GeckoView, var url: String = "", var title: String = "", val private: Boolean = false, val guest: Boolean = false, var group: String = "General", var serializedState: String? = null, var canGoBack: Boolean = false, var canGoForward: Boolean = false, var pinned: Boolean = false)
     private lateinit var root: LinearLayout
     private lateinit var address: EditText
     private lateinit var tabsLabel: TextView
@@ -49,6 +49,8 @@ class MainActivity : Activity() {
     private val tabs = mutableListOf<Tab>()
     private var active = 0
     private var privateMode = false
+    private var guestMode = false
+    private var guestReturnTab: Tab? = null
     private var dark = false
     private var desktopMode = false
     private var fullScreen = false
@@ -132,6 +134,7 @@ class MainActivity : Activity() {
         controls.addView(button("PiP") { enterPip() })
         controls.addView(button("Zorvi") { openInZorvi() })
         controls.addView(button("Private") { togglePrivate() })
+        controls.addView(button(if (guestMode) "End Guest" else "Guest Mode") { if (guestMode) endGuestMode() else startGuestMode() })
         controls.addView(button("☾") { dark = !dark; applyTheme() })
         root.addView(HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
@@ -539,7 +542,7 @@ class MainActivity : Activity() {
     private fun newTab(url: String = homePage(), restoredState: String? = null) {
         desktopMode = prefs.getBoolean("desktop_mode", false)
         val settings = GeckoSessionSettings.Builder()
-            .usePrivateMode(privateMode)
+            .usePrivateMode(privateMode || guestMode)
             .useTrackingProtection(prefs.getBoolean("tracking_protection", true))
             .allowJavascript(true)
             .userAgentMode(if (desktopMode) GeckoSessionSettings.USER_AGENT_MODE_DESKTOP else GeckoSessionSettings.USER_AGENT_MODE_MOBILE)
@@ -549,12 +552,13 @@ class MainActivity : Activity() {
         val view = GeckoView(this).apply {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) setAutofillEnabled(true)
         }
-        val tab = Tab(session, view, private = privateMode, group = if (privateMode) "Private" else (prefs.getString("active_group", "General") ?: "General"))
+        val isGuestTab = guestMode
+        val tab = Tab(session, view, private = privateMode || isGuestTab, guest = isGuestTab, group = if (isGuestTab) "Guest" else if (privateMode) "Private" else (prefs.getString("active_group", "General") ?: "General"))
         session.setContentDelegate(object : GeckoSession.ContentDelegate {
             override fun onExternalResponse(session: GeckoSession, response: org.mozilla.geckoview.WebResponse) {
-                if (tab.private) {
+                if (tab.private || tab.guest) {
                     response.body?.close()
-                    runOnUiThread { Toast.makeText(this@MainActivity, "Downloads are disabled in private tabs.", Toast.LENGTH_LONG).show() }
+                    runOnUiThread { Toast.makeText(this@MainActivity, "Downloads are disabled in private and guest sessions.", Toast.LENGTH_LONG).show() }
                     return
                 }
                 runOnUiThread { queueDownload(response.uri, response.headers["content-disposition"], response.headers["content-type"], response.body) }
@@ -606,7 +610,7 @@ class MainActivity : Activity() {
                 val next = url.orEmpty()
                 tab.url = next
                 if (current() === tab) address.setText(next)
-                if (!tab.private && (next.startsWith("https://", true) || next.startsWith("http://", true))) {
+                if (!tab.private && !tab.guest && (next.startsWith("https://", true) || next.startsWith("http://", true))) {
                     saveHistory(next)
                     saveTabs()
                 }
@@ -679,7 +683,7 @@ class MainActivity : Activity() {
         session.setProgressDelegate(object : GeckoSession.ProgressDelegate {
             override fun onSessionStateChange(session: GeckoSession, sessionState: GeckoSession.SessionState) {
                 tab.serializedState = sessionState.toString()
-                if (!tab.private) saveTabs()
+                if (!tab.private && !tab.guest) saveTabs()
             }
         })
         session.open(runtime)
@@ -899,7 +903,7 @@ class MainActivity : Activity() {
         val saved = JSONArray()
         var savedActive = 0
         tabs.forEachIndexed { index, tab ->
-            if (!tab.private) {
+            if (!tab.private && !tab.guest) {
                 val item = org.json.JSONObject().put("url", tab.url).put("group", tab.group).put("pinned", tab.pinned)
                 tab.serializedState?.let { item.put("state", it) }
                 saved.put(item)
@@ -1128,7 +1132,7 @@ class MainActivity : Activity() {
 
     private fun showTabs() {
         val names = tabs.mapIndexed { i, tab ->
-            "${i + 1}. ${tab.title.ifBlank { tab.url.ifBlank { "New tab" } }}${if (tab.private) " [Private]" else ""}"
+            "${i + 1}. ${tab.title.ifBlank { tab.url.ifBlank { "New tab" } }}${if (tab.guest) " [Guest]" else if (tab.private) " [Private]" else ""}"
         }.toMutableList()
         names.add("＋ New tab")
         names.add("＋ New tab group")
@@ -1166,7 +1170,7 @@ class MainActivity : Activity() {
 
     private fun closeTab() {
         val removed = current() ?: return
-        if (!removed.private && (removed.url.startsWith("https://") || removed.url.startsWith("http://"))) {
+        if (!removed.private && !removed.guest && (removed.url.startsWith("https://") || removed.url.startsWith("http://"))) {
             val recently = runCatching { JSONArray(prefs.getString("recently_closed", "[]")) }.getOrDefault(JSONArray())
             val updated = JSONArray().put(removed.url)
             for (i in 0 until recently.length()) {
@@ -1185,9 +1189,60 @@ class MainActivity : Activity() {
     }
 
     private fun togglePrivate() {
+        if (guestMode) {
+            Toast.makeText(this, "End Guest Mode before starting a Private tab.", Toast.LENGTH_LONG).show()
+            return
+        }
         privateMode = !privateMode
         Toast.makeText(this, if (privateMode) "Private session enabled: Gecko private mode is active." else "Private mode off", Toast.LENGTH_SHORT).show()
         newTab("about:blank")
+    }
+
+    private fun startGuestMode() {
+        if (guestMode) return
+        guestReturnTab = current()
+        privateMode = false
+        guestMode = true
+        newTab("about:blank")
+        Toast.makeText(this, "Guest Mode started. Guest tabs are temporary and are not saved to history or session restore.", Toast.LENGTH_LONG).show()
+        refreshGuestModeButton()
+    }
+
+    private fun endGuestMode() {
+        if (!guestMode) return
+        val guestTabs = tabs.filter { it.guest }
+        guestTabs.forEach { tab ->
+            val index = tabs.indexOf(tab)
+            if (index >= 0) tabs.removeAt(index)
+            tab.session.setActive(false)
+            tab.view.releaseSession()
+            if (tab.session.isOpen) tab.session.close()
+        }
+        guestMode = false
+        privateMode = false
+        val returnTab = guestReturnTab
+        guestReturnTab = null
+        active = returnTab?.let { tabs.indexOf(it) }?.takeIf { it >= 0 } ?: 0
+        if (tabs.isEmpty()) newTab(homePage())
+        else {
+            showOnlyActive()
+            updateTabs()
+            saveTabs()
+        }
+        refreshGuestModeButton()
+        Toast.makeText(this, "Guest session ended. Guest tabs have been closed.", Toast.LENGTH_LONG).show()
+    }
+
+    private fun refreshGuestModeButton() {
+        if (!::root.isInitialized || root.childCount < 2) return
+        val controls = (root.getChildAt(1) as? HorizontalScrollView)?.getChildAt(0) as? LinearLayout ?: return
+        for (i in 0 until controls.childCount) {
+            val child = controls.getChildAt(i)
+            if (child is Button && (child.text == "Guest Mode" || child.text == "End Guest")) {
+                child.text = if (guestMode) "End Guest" else "Guest Mode"
+                break
+            }
+        }
     }
 
     private fun applyTheme() {
