@@ -16,10 +16,17 @@ An Android browser prototype with a Chrome-inspired interface, powered by Mozill
 - Quick links for ChatGPT, Claude, Gemini, Copilot, Perplexity, Grok, DeepSeek, Mistral Le Chat and Meta AI
 - Quick links for Google, YouTube, GitHub, Instagram, Discord, WhatsApp Web and Microsoft 365
 - Dark browser toolbar theme
+- Custom home page and Home shortcut
+- AI assistant and page-summary handoff to ChatGPT
+- Google Translate page handoff and Gecko reader-mode entry
+- Privacy controls for GeckoView tracking protection
+- Local history/bookmark/tab-restore cleanup
+- Page-crash recovery actions and low-memory session handling
+- Close-other-tabs action
 
 ## Compatibility status
 
-The AI and major-site shortcuts are navigation conveniences, not compatibility certifications. Successful sign-in, streaming responses, voice, media, uploads and session restoration still require final testing on a real Android device. See [the Phase 2 compatibility plan](docs/SEVEN_SITE_COMPATIBILITY_TEST_PLAN.md).
+The AI and major-site shortcuts are navigation conveniences, not compatibility certifications. Successful sign-in, streaming responses, voice, media, uploads and session restoration still require final testing on a real Android device. Phase 3 features are documented in [the Phase 3 progress log](docs/PHASE3_PROGRESS.md); some advanced features remain incomplete. See [the Phase 2 compatibility plan](docs/SEVEN_SITE_COMPATIBILITY_TEST_PLAN.md).
 
 ## Build
 
