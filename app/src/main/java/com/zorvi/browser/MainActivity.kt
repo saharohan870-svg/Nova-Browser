@@ -332,12 +332,33 @@ class MainActivity : Activity() {
             }
             override fun onContentPermissionRequest(session: GeckoSession, perm: GeckoSession.PermissionDelegate.ContentPermission): GeckoResult<Int> {
                 val result = GeckoResult<Int>()
-                val host = runCatching { Uri.parse(tab.url).host }.getOrNull() ?: "this website"
+                val host = runCatching { Uri.parse(perm.uri).host }.getOrNull() ?: "this website"
+                val permissionKey = "site_permission_" + host + "_" + perm.permission
+                val remembered = prefs.getInt(permissionKey, -1)
+                if (remembered == GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW || remembered == GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY) {
+                    result.complete(remembered)
+                    return result
+                }
                 runOnUiThread {
+                    val remember = CheckBox(this@MainActivity).apply { text = "Remember this choice for " + host }
+                    val content = LinearLayout(this@MainActivity).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(32, 8, 32, 0)
+                        addView(TextView(this@MainActivity).apply { text = "Allow " + host + " to access this website permission?" })
+                        addView(remember)
+                    }
                     val dialog = AlertDialog.Builder(this@MainActivity).setTitle("Website permission")
-                        .setMessage("Allow " + host + " to access this permission?")
-                        .setPositiveButton("Allow") { _, _ -> result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW) }
-                        .setNegativeButton("Block") { _, _ -> result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY) }
+                        .setView(content)
+                        .setPositiveButton("Allow") { _, _ ->
+                            val value = GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW
+                            if (remember.isChecked) prefs.edit().putInt(permissionKey, value).apply()
+                            result.complete(value)
+                        }
+                        .setNegativeButton("Block") { _, _ ->
+                            val value = GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY
+                            if (remember.isChecked) prefs.edit().putInt(permissionKey, value).apply()
+                            result.complete(value)
+                        }
                         .setOnCancelListener { result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY) }.create()
                     dialog.setOnShowListener { perm.notifyShown() }
                     dialog.show()
