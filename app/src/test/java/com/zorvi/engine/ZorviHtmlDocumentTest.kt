@@ -135,6 +135,13 @@ class ZorviHtmlDocumentTest {
     }
 
 
+    @Test fun stripsOneInitialNewlineFromPreformattedElements() {
+        val document = HtmlDocument.parse("<pre>\nFirst</pre><textarea>\r\nSecond</textarea><listing>\rThird</listing>")
+        assertEquals("First", document.textContent(document.findFirst("pre")!!))
+        assertEquals("Second", document.textContent(document.findFirst("textarea")!!))
+        assertEquals("Third", document.textContent(document.findFirst("listing")!!))
+    }
+
     @Test fun treatsPlaintextAsTextUntilEndOfInput() {
         val document = HtmlDocument.parse("<plaintext><b>not markup</b> &amp; still text")
         assertEquals("<b>not markup</b> &amp; still text", document.textContent(document.findFirst("plaintext")!!))
