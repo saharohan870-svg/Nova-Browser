@@ -54,6 +54,7 @@ class ZorviHtmlDocumentTest {
     @Test fun ignoresOversizedTailWithoutCrashing() {
         val document = HtmlDocument.parse("<p>start</p>" + "x".repeat(2_000_100))
         assertTrue(document.visibleBlocks().any { it.text == "start" })
+        assertTrue(document.sourceTruncated)
     }
     @Test fun preservesAttributesOnExplicitHtmlHeadAndBodyElements() {
         val document = HtmlDocument.parse("""<html lang="en"><head data-head=yes><title>Page</title></head><body class="site" id=main><p>Content</p></body></html>""")
@@ -132,6 +133,7 @@ class ZorviHtmlDocumentTest {
         val source = "<div>".repeat(2_000) + "safe" + "</div>".repeat(2_000)
         val document = HtmlDocument.parse(source)
         assertTrue(document.textContent(document.findFirst("body")!!).contains("safe"))
+        assertTrue(document.nestingLimitReached)
     }
 
 
