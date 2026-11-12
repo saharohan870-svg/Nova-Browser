@@ -76,6 +76,16 @@ internal data class HtmlDocument(val root: HtmlNode) {
             fun closeParagraphIfNeeded(nextTag: String) {
                 if (nextTag in pClosers && stack.any { it.tag == "p" }) closeOpen("p")
             }
+            fun closeOpenInScope(tag: String, boundaries: Set<String>) {
+                for (index in stack.lastIndex downTo 1) {
+                    val openTag = stack[index].tag
+                    if (openTag == tag) {
+                        while (stack.size > index) stack.removeAt(stack.lastIndex)
+                        return
+                    }
+                    if (openTag in boundaries) return
+                }
+            }
             fun parseAttributes(sourceTag: String, from: Int): Map<String, String> {
                 val result = linkedMapOf<String, String>()
                 var i = from
@@ -184,13 +194,31 @@ internal data class HtmlDocument(val root: HtmlNode) {
                 }
                 closeParagraphIfNeeded(name)
                 when (name) {
-                    "li" -> closeOpen("li")
-                    "dt", "dd" -> { closeOpen("dt"); closeOpen("dd") }
-                    "option" -> closeOpen("option")
-                    "optgroup" -> { closeOpen("option"); closeOpen("optgroup") }
-                    "rp", "rt" -> { closeOpen("rp"); closeOpen("rt") }
-                    "tr" -> { closeOpen("td"); closeOpen("th"); closeOpen("tr") }
-                    "td", "th" -> { closeOpen("td"); closeOpen("th") }
+                    "li" -> closeOpenInScope("li", setOf("ul", "ol"))
+                    "dt", "dd" -> {
+                        closeOpenInScope("dt", setOf("dl"))
+                        closeOpenInScope("dd", setOf("dl"))
+                    }
+                    "option" -> closeOpenInScope("option", setOf("select", "datalist", "optgroup"))
+                    "optgroup" -> {
+                        closeOpenInScope("option", setOf("select", "datalist", "optgroup"))
+                        closeOpenInScope("optgroup", setOf("select", "datalist"))
+                    }
+                    "rp", "rt" -> {
+                        closeOpenInScope("rp", setOf("ruby"))
+                        closeOpenInScope("rt", setOf("ruby"))
+                    }
+                    "tr" -> {
+                        val boundaries = setOf("table", "tbody", "thead", "tfoot")
+                        closeOpenInScope("td", boundaries)
+                        closeOpenInScope("th", boundaries)
+                        closeOpenInScope("tr", setOf("table", "tbody", "thead", "tfoot"))
+                    }
+                    "td", "th" -> {
+                        val boundaries = setOf("table", "tbody", "thead", "tfoot", "tr")
+                        closeOpenInScope("td", boundaries)
+                        closeOpenInScope("th", boundaries)
+                    }
                     "thead", "tbody", "tfoot" -> {
                         closeOpen("td"); closeOpen("th"); closeOpen("tr")
                         closeOpen("thead"); closeOpen("tbody"); closeOpen("tfoot")
