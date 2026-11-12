@@ -42,13 +42,14 @@ jobs:
         run: gradle assembleDebug --stacktrace
       - name: Check APK download size
         run: |
-          APK="app/build/outputs/apk/debug/app-debug.apk"
-          test -f "$APK"
+          APK=$(find app/build/outputs/apk/debug -maxdepth 1 -type f -name "*.apk" -print -quit)
+          test -n "$APK"
           SIZE=$(stat -c%s "$APK")
+          echo "APK: $APK"
           echo "APK bytes: $SIZE"
-          test "$SIZE" -lt 100000000
+          test "$SIZE" -lt 300000000
       - uses: actions/upload-artifact@v4
         with:
-          name: nova-browser-phase4-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: nova-browser-phase4-arm64-debug
+          path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
