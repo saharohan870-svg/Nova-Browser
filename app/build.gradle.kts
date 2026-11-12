@@ -29,7 +29,7 @@ android {
 
 dependencies {
     // Mozilla GeckoView: bundled Gecko/SpiderMonkey engine, independent of Android System WebView.
-    implementation("org.mozilla.geckoview:geckoview:159.0.20261102144711")
+    implementation("org.mozilla.geckoview:geckoview:128.0.20250109135142")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     testImplementation("junit:junit:4.13.2")
 }
