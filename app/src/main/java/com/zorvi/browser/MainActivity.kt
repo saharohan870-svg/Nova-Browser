@@ -250,7 +250,6 @@ class MainActivity : Activity() {
         removed.session.close()
         removed.view.releaseSession()
         active = active.coerceAtMost(tabs.lastIndex)
-        activeCanGoBack = false
         showOnlyActive()
         updateTabs()
     }
