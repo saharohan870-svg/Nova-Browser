@@ -118,7 +118,10 @@ class MainActivity : Activity() {
         controls.addView(button("Zorvi") { openInZorvi() })
         controls.addView(button("Private") { togglePrivate() })
         controls.addView(button("☾") { dark = !dark; applyTheme() })
-        root.addView(controls)
+        root.addView(HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(controls)
+        })
         setContentView(root)
         applyTheme()
     }
