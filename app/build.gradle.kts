@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.zorvi.browser"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.zorvi.browser"
@@ -29,7 +29,7 @@ android {
 
 dependencies {
     // GeckoView is the primary web rendering engine. Keep QuickJS for the experimental Zorvi engine.
-    implementation("org.mozilla.geckoview:geckoview-nightly:162.0.20261111213251")
+    implementation("org.mozilla.geckoview:geckoview:140.0.20250630155423")
     implementation("io.github.dokar3:quickjs-kt-android:1.0.15")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     testImplementation("junit:junit:4.13.2")
