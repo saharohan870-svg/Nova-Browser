@@ -31,7 +31,7 @@ import java.util.Locale
  * Each tab owns one GeckoSession; private tabs use Gecko's private-mode session setting.
  */
 class MainActivity : Activity() {
-    private data class Tab(val session: GeckoSession, val view: GeckoView, var url: String = "", var title: String = "", val private: Boolean = false, var group: String = "General", var serializedState: String? = null)
+    private data class Tab(val session: GeckoSession, val view: GeckoView, var url: String = "", var title: String = "", val private: Boolean = false, var group: String = "General", var serializedState: String? = null, var canGoBack: Boolean = false, var canGoForward: Boolean = false)
     private lateinit var root: LinearLayout
     private lateinit var address: EditText
     private lateinit var tabsLabel: TextView
@@ -152,6 +152,8 @@ class MainActivity : Activity() {
             }
         })
         session.setNavigationDelegate(object : GeckoSession.NavigationDelegate {
+            override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) { tab.canGoBack = canGoBack }
+            override fun onCanGoForward(session: GeckoSession, canGoForward: Boolean) { tab.canGoForward = canGoForward }
             override fun onLocationChange(
                 session: GeckoSession,
                 url: String?,
@@ -473,7 +475,7 @@ class MainActivity : Activity() {
     override fun onBackPressed() {
         val tab = current()
         if (fullScreen) setBrowserFullScreen(false)
-        else if (tab != null && tab.session.canGoBack) tab.session.goBack() else if (tabs.size > 1) closeTab() else super.onBackPressed()
+        else if (tab != null && tab.canGoBack) tab.session.goBack() else if (tabs.size > 1) closeTab() else super.onBackPressed()
     }
 
     override fun onResume() {
