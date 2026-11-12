@@ -18,7 +18,8 @@
     "alarms",
     "http://*/*",
     "https://*/*",
-    "https://easylist.to/*"
+    "https://easylist.to/*",
+    "unlimitedStorage"
   ],
   "background": {
     "scripts": [
