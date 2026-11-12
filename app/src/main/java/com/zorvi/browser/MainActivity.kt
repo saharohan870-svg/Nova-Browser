@@ -35,6 +35,12 @@ import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.TranslatorOptions
 import java.net.URLEncoder
 import java.util.Locale
+import java.io.BufferedReader
+import java.io.StringReader
+import java.util.concurrent.Executors
+import com.wireguard.android.backend.GoBackend
+import com.wireguard.android.backend.Tunnel
+import com.wireguard.config.Config
 
 /**
  * Nova Browser main shell backed by Mozilla GeckoView.
@@ -59,6 +65,16 @@ class MainActivity : Activity() {
     private var pendingAndroidPermission: GeckoSession.PermissionDelegate.Callback? = null
     private val requestFile = 4101
     private val requestWebPermission = 4102
+    private val requestWireGuardConfig = 4110
+    private val requestWireGuardConsent = 4111
+    private val wireGuardStore by lazy { WireGuardConfigStore(this) }
+    private val wireGuardBackend by lazy { GoBackend(applicationContext) }
+    private val wireGuardExecutor = Executors.newSingleThreadExecutor()
+    @Volatile private var wireGuardConnected = false
+    private val wireGuardTunnel = object : Tunnel {
+        override fun getName(): String = "Nova"
+        override fun onStateChange(newState: Tunnel.State) { wireGuardConnected = newState == Tunnel.State.UP }
+    }
     private val prefs by lazy { getSharedPreferences("zorvi", Context.MODE_PRIVATE) }
     private val engines = listOf("Google", "Bing", "DuckDuckGo", "Brave Search")
     private val runtime: GeckoRuntime by lazy { getOrCreateRuntime() }
@@ -1102,6 +1118,18 @@ class MainActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == requestWireGuardConfig) {
+            if (resultCode == RESULT_OK && data?.data != null) handleWireGuardProfile(data.data!!)
+            return
+        }
+        if (requestCode == requestWireGuardConsent) {
+            if (resultCode == RESULT_OK) {
+                val raw = wireGuardStore.load()
+                if (!raw.isNullOrBlank()) startWireGuardAfterConsent(raw)
+                else Toast.makeText(this, "Import a WireGuard profile first", Toast.LENGTH_SHORT).show()
+            } else Toast.makeText(this, "VPN permission was not granted", Toast.LENGTH_LONG).show()
+            return
+        }
         if (requestCode == requestFile) {
             val prompt = pendingFilePrompt
             val result = pendingFileResult
@@ -1200,9 +1228,99 @@ class MainActivity : Activity() {
     }
 
     private fun showVpnStatus() {
-        AlertDialog.Builder(this).setTitle("Nova VPN")
-            .setMessage("Not configured. Nova has no VPN provider, server endpoint, credentials, or tunnel SDK connected yet. Your internet traffic is not protected by a Nova VPN.\n\nThe Android VPN permission alone cannot provide VPN servers or route traffic.")
-            .setPositiveButton("OK", null).show()
+        val configured = wireGuardStore.hasProfile()
+        val status = if (wireGuardConnected) "Connected" else if (configured) "Disconnected — WireGuard profile saved" else "Not configured — import a WireGuard profile"
+        val message = "$status\n\nNova uses the official WireGuard Android tunnel library. No Nova/AdGuard account is required. You must import a valid .conf profile from a VPN server you control or trust.\n\nImportant: Android's VPN service applies the profile's AllowedIPs routes at device level. This is not guaranteed to protect only Nova Browser. Check the profile's routing and DNS settings before connecting."
+        val dialog = AlertDialog.Builder(this).setTitle("Nova VPN").setMessage(message)
+            .setNeutralButton("Import .conf", null)
+            .setNegativeButton(if (configured) "Remove profile" else "Close", null)
+            .setPositiveButton(if (wireGuardConnected) "Disconnect" else "Connect", null).create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener { dialog.dismiss(); importWireGuardProfile() }
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
+                if (configured) {
+                    if (wireGuardConnected) stopWireGuardTunnel()
+                    wireGuardStore.clear()
+                    dialog.dismiss()
+                    Toast.makeText(this, "WireGuard profile removed", Toast.LENGTH_SHORT).show()
+                } else dialog.dismiss()
+            }
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                dialog.dismiss()
+                if (wireGuardConnected) stopWireGuardTunnel() else connectWireGuardTunnel()
+            }
+        }
+        dialog.show()
+    }
+
+    private fun importWireGuardProfile() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+        }
+        startActivityForResult(intent, requestWireGuardConfig)
+    }
+
+    private fun handleWireGuardProfile(uri: Uri) {
+        try {
+            val raw = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                ?: throw IllegalArgumentException("Could not read the selected file")
+            require(raw.length <= 65536) { "Configuration file is too large (maximum 64 KB)" }
+            Config.parse(BufferedReader(StringReader(raw)))
+            wireGuardStore.save(raw)
+            Toast.makeText(this, "WireGuard profile imported and encrypted on this device", Toast.LENGTH_LONG).show()
+            showVpnStatus()
+        } catch (error: Exception) {
+            Toast.makeText(this, "Invalid WireGuard profile: ${error.message ?: "check the .conf file"}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun connectWireGuardTunnel() {
+        val raw = wireGuardStore.load()
+        if (raw.isNullOrBlank()) {
+            Toast.makeText(this, "Import a WireGuard .conf profile first", Toast.LENGTH_LONG).show()
+            importWireGuardProfile()
+            return
+        }
+        val consent = android.net.VpnService.prepare(this)
+        if (consent != null) startActivityForResult(consent, requestWireGuardConsent)
+        else startWireGuardAfterConsent(raw)
+    }
+
+    private fun startWireGuardAfterConsent(raw: String) {
+        Toast.makeText(this, "Connecting WireGuard…", Toast.LENGTH_SHORT).show()
+        wireGuardExecutor.execute {
+            try {
+                val config = Config.parse(BufferedReader(StringReader(raw)))
+                val state = wireGuardBackend.setState(wireGuardTunnel, Tunnel.State.UP, config)
+                wireGuardConnected = state == Tunnel.State.UP
+                runOnUiThread {
+                    Toast.makeText(this, if (wireGuardConnected) "WireGuard tunnel connected" else "WireGuard did not reach Connected state", Toast.LENGTH_LONG).show()
+                    showVpnStatus()
+                }
+            } catch (error: Exception) {
+                wireGuardConnected = false
+                runOnUiThread {
+                    Toast.makeText(this, "VPN connection failed: ${error.message ?: "unknown error"}", Toast.LENGTH_LONG).show()
+                    showVpnStatus()
+                }
+            }
+        }
+    }
+
+    private fun stopWireGuardTunnel() {
+        wireGuardExecutor.execute {
+            try {
+                wireGuardBackend.setState(wireGuardTunnel, Tunnel.State.DOWN, null)
+                wireGuardConnected = false
+                runOnUiThread {
+                    Toast.makeText(this, "WireGuard disconnected", Toast.LENGTH_SHORT).show()
+                    showVpnStatus()
+                }
+            } catch (error: Exception) {
+                runOnUiThread { Toast.makeText(this, "Could not disconnect cleanly: ${error.message}", Toast.LENGTH_LONG).show() }
+            }
+        }
     }
 
     private fun showGuestTorStatus() {
