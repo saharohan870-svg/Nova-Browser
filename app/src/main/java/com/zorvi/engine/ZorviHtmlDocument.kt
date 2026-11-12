@@ -17,7 +17,11 @@ internal data class HtmlNode(
     val children: MutableList<HtmlNode> = mutableListOf()
 )
 
-internal data class HtmlDocument(val root: HtmlNode) {
+internal data class HtmlDocument(
+    val root: HtmlNode,
+    val sourceTruncated: Boolean = false,
+    val nestingLimitReached: Boolean = false
+) {
     companion object {
         private const val MAX_SOURCE_CHARS = 2_000_000
         private const val MAX_TREE_DEPTH = 256
@@ -49,6 +53,7 @@ internal data class HtmlDocument(val root: HtmlNode) {
             val stack = mutableListOf(html, head)
             var inHead = true
             var cursor = 0
+            var nestingLimitReached = false
 
             fun current(): HtmlNode = stack.lastOrNull() ?: body
             fun switchToBody() {
@@ -252,10 +257,12 @@ internal data class HtmlDocument(val root: HtmlNode) {
                     }
                 }
                 val selfClosing = trimmed.endsWith("/")
-                if (name !in voidTags && !selfClosing && stack.size < MAX_TREE_DEPTH) stack += node
+                if (name !in voidTags && !selfClosing) {
+                    if (stack.size < MAX_TREE_DEPTH) stack += node else nestingLimitReached = true
+                }
             }
 
-            return HtmlDocument(document)
+            return HtmlDocument(document, sourceTruncated = source.length > input.length, nestingLimitReached = nestingLimitReached)
         }
 
         private fun findRawTextEndTag(source: String, tag: String, start: Int): Int {
