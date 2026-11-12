@@ -64,6 +64,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         buildUi()
+        applyCookiePolicy()
         restoreTabs()
         if (tabs.isEmpty()) newTab(homePage())
     }
@@ -442,8 +443,46 @@ class MainActivity : Activity() {
             .setNegativeButton("Close", null).show()
     }
 
+    private fun applyCookiePolicy() {
+        val defaultPolicy = org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_NON_TRACKERS
+        val policy = prefs.getInt("cookie_policy", defaultPolicy)
+        runtime.settings.contentBlocking.setCookieBehavior(policy)
+        runtime.settings.contentBlocking.setCookieBehaviorPrivateMode(policy)
+    }
+
+    private fun chooseCookiePolicy() {
+        val labels = arrayOf(
+            "Block known trackers (recommended)",
+            "Block all third-party cookies",
+            "Allow all cookies",
+            "Block all cookies"
+        )
+        val values = intArrayOf(
+            org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_NON_TRACKERS,
+            org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_FIRST_PARTY,
+            org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_ALL,
+            org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_NONE
+        )
+        val currentPolicy = prefs.getInt("cookie_policy", values[0])
+        val selected = values.indexOf(currentPolicy).coerceAtLeast(0)
+        AlertDialog.Builder(this).setTitle("Cookie policy")
+            .setSingleChoiceItems(labels, selected) { dialog, which ->
+                val policy = values[which]
+                prefs.edit().putInt("cookie_policy", policy).apply()
+                runtime.settings.contentBlocking.setCookieBehavior(policy)
+                runtime.settings.contentBlocking.setCookieBehaviorPrivateMode(policy)
+                dialog.dismiss()
+                Toast.makeText(this, "Cookie policy updated. Reload pages to apply changes.", Toast.LENGTH_LONG).show()
+            }.setNegativeButton("Cancel", null).show()
+    }
+
     private fun showWebsiteDataControls() {
-        val actions = arrayOf("Clear cookies and site data", "Clear cached files", "Clear all browsing data")
+        val actions = arrayOf(
+            "Cookie policy",
+            "Clear cookies and site data",
+            "Clear cached files",
+            "Clear all browsing data"
+        )
         val descriptions = arrayOf(
             "Signs you out of websites and clears cookies, local storage, site permissions and related site data.",
             "Removes cached images and files. Website sign-ins should remain.",
@@ -451,15 +490,20 @@ class MainActivity : Activity() {
         )
         AlertDialog.Builder(this).setTitle("Website data")
             .setItems(actions) { _, which ->
-                AlertDialog.Builder(this).setTitle(actions[which]).setMessage(descriptions[which])
-                    .setPositiveButton("Clear") { _, _ ->
-                        val flags = when (which) {
-                            0 -> org.mozilla.geckoview.StorageController.ClearFlags.SITE_DATA
-                            1 -> org.mozilla.geckoview.StorageController.ClearFlags.ALL_CACHES
-                            else -> org.mozilla.geckoview.StorageController.ClearFlags.ALL
-                        }
-                        clearGeckoData(flags, which == 2)
-                    }.setNegativeButton("Cancel", null).show()
+                if (which == 0) {
+                    chooseCookiePolicy()
+                } else {
+                    val index = which - 1
+                    AlertDialog.Builder(this).setTitle(actions[which]).setMessage(descriptions[index])
+                        .setPositiveButton("Clear") { _, _ ->
+                            val flags = when (index) {
+                                0 -> org.mozilla.geckoview.StorageController.ClearFlags.SITE_DATA
+                                1 -> org.mozilla.geckoview.StorageController.ClearFlags.ALL_CACHES
+                                else -> org.mozilla.geckoview.StorageController.ClearFlags.ALL
+                            }
+                            clearGeckoData(flags, index == 2)
+                        }.setNegativeButton("Cancel", null).show()
+                }
             }.setNegativeButton("Close", null).show()
     }
 
