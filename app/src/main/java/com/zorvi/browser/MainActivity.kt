@@ -1204,7 +1204,7 @@ class MainActivity : Activity() {
         privateMode = false
         guestMode = true
         newTab("about:blank")
-        Toast.makeText(this, "Guest Mode started. Guest tabs are temporary and are not saved to history or session restore.", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "Guest Mode started. Temporary data is not saved. IP masking / Tor routing is not active.", Toast.LENGTH_LONG).show()
         refreshGuestModeButton()
     }
 
