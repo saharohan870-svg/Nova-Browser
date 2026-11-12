@@ -1,7 +1,19 @@
-name: Zorvi Android Interim APK (WebView)
+name: Zorvi GeckoView Android APK
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - zorvi-brave-migration
+    paths:
+      - 'app/**'
+      - 'settings.gradle.kts'
+      - '.github/workflows/android.yml'
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'settings.gradle.kts'
+      - '.github/workflows/android.yml'
 
 permissions:
   contents: read
@@ -24,8 +36,6 @@ jobs:
           packages: platform-tools
       - name: Install required Android SDK packages
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
-      - name: Verify pinned Brave and Chromium upstream refs
-        run: python3 scripts/verify_upstream_pins.py
       - name: Build and test debug APK
         run: gradle testDebugUnitTest assembleDebug --stacktrace
       - name: Check APK download size
@@ -37,6 +47,6 @@ jobs:
           test "$SIZE" -lt 100000000
       - uses: actions/upload-artifact@v4
         with:
-          name: zorvi-browser-interim-webview-debug
+          name: zorvi-geckoview-arm64-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
