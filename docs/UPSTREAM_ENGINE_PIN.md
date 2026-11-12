@@ -2,35 +2,35 @@
 
 Reviewed: 2026-11-12
 
-## Selected baseline
+## Selected stable baseline
 
-| Component | Pin | Reason |
+| Component | Release/tag | Immutable commit |
 |---|---|---|
-| Brave Android source release | `v1.99.56` | Latest stable Brave release observed during this review |
-| Chromium | `157.0.8103.50` | Chromium revision reported by that Brave stable release |
-| Android target ABI | `arm64-v8a` | Initial target for modern ARM64 Android phones |
+| Brave browser orchestration | `v1.99.56` | `f14b4ba5b0256728ce74ca32bb0ccb43e3e6cff8` |
+| Brave core | `v1.99.56` | `4d1dfc472152bcc8f3217be190c8a7ad3007039f` |
+| Chromium | `157.0.8103.50` | `049750111b1e5c11565c792b2aeed5541f332bad` |
+| Android target ABI | `arm64-v8a` | — |
 
-Upstream release record: https://github.com/brave/brave-browser/releases/tag/v1.99.56
+The Brave browser commit explicitly pins `brave-core` to the `v1.99.56` tag. The Brave core release notes identify Chromium `157.0.8103.50`. The Chromium tag resolves to the commit shown above in the Chromium source mirror.
 
-Brave release notes: https://brave.com/latest/
+## Upstream evidence
 
-The Brave release notes dated 2026-11-11 identify Android release v1.99.56 and state that it upgrades Chromium to 157.0.8103.50. Use this stable baseline rather than a Nightly or Beta tag for the first Zorvi port.
+- Brave release: https://github.com/brave/brave-browser/releases/tag/v1.99.56
+- Brave browser commit: https://github.com/brave/brave-browser/commit/f14b4ba5b0256728ce74ca32bb0ccb43e3e6cff8
+- Brave core commit: https://github.com/brave/brave-core/commit/4d1dfc472152bcc8f3217be190c8a7ad3007039f
+- Chromium tag commit: https://github.com/chromium/chromium/commit/049750111b1e5c11565c792b2aeed5541f332bad
+- Brave release notes: https://brave.com/latest/
 
-## Important reproducibility rule
+## Verification
 
-The release tag is the human-readable source pin. Before any source checkout/build, resolve and record the immutable Git commit SHA for `v1.99.56`, and record the Chromium DEPS revision resolved by that checkout. Do not infer either hash from the version string. The build record must include:
+Run `scripts/verify_upstream_pins.sh` before any source sync. It checks that upstream Git refs still resolve to the recorded immutable commits. A changed ref is a stop condition requiring review, not an automatic pin update.
 
-- Brave browser tag and resolved commit SHA
-- Brave core commit SHA
-- Chromium revision from the checked-out DEPS configuration
-- Android SDK/NDK and JDK versions
-- Build command and build environment image/runner
-- SHA-256 of the resulting APK
+This is a source pin, not a completed source checkout. The full synchronized checkout must still record the Chromium revision from the actual `src/DEPS`/gclient solution and compare it with the release pin before compiling. The exact Chromium tag commit above is the release baseline; gclient may select a commit containing release-specific patch rolls, so do not silently replace the resolved DEPS revision with the tag commit.
 
 ## Build gate
 
-This pin is a source-selection decision only. It does **not** mean the source has been downloaded, dependencies synchronized, or an APK built. The free standard GitHub runner remains reserved for lightweight Android app checks; do not attempt the full Chromium checkout/build there, and do not enable a paid runner.
+No source has been downloaded or compiled by this pinning step. The free standard GitHub runner remains reserved for lightweight Android app checks. Do not attempt the full Chromium checkout/build there, and do not enable a paid runner.
 
 ## Upgrade policy
 
-For each engine update, select a stable Brave Android release, review its Chromium security updates and Android changes, update this file, resolve all immutable revisions, then run the full build and smoke-test gate before adopting it.
+For each engine update, select a stable Brave Android release, resolve all annotated tags to commit SHAs, verify the Chromium version and resolved DEPS revision, update the pin table, then run the full build and smoke-test gate before adoption.
