@@ -25,7 +25,7 @@ internal data class HtmlDocument(val root: HtmlNode) {
             "area", "base", "br", "col", "embed", "hr", "img", "input",
             "link", "meta", "param", "source", "track", "wbr"
         )
-        private val rawTextTags = setOf("script", "style", "textarea", "title")
+        private val rawTextTags = setOf("script", "style", "textarea", "title", "xmp", "iframe", "noembed", "noframes", "plaintext")
         private val pClosers = setOf(
             "address", "article", "aside", "blockquote", "div", "dl", "fieldset",
             "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "header",
@@ -112,12 +112,12 @@ internal data class HtmlDocument(val root: HtmlNode) {
             while (cursor < input.length) {
                 val parent = current()
                 if (parent.tag in rawTextTags) {
-                    val closeStart = findRawTextEndTag(input, parent.tag, cursor)
+                    val closeStart = if (parent.tag == "plaintext") -1 else findRawTextEndTag(input, parent.tag, cursor)
                     val end = if (closeStart < 0) input.length else closeStart
                     appendText(
                         input.substring(cursor, end),
                         allowInHead = true,
-                        decode = parent.tag !in setOf("script", "style")
+                        decode = parent.tag in setOf("textarea", "title")
                     )
                     cursor = end
                     if (cursor >= input.length) break
