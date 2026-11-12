@@ -91,8 +91,25 @@ jobs:
             echo "chromium_src_tag=157.0.8103.50 (release tag reference; synced SHA above is authoritative)"
           } | tee "$GITHUB_WORKSPACE/engine-artifacts/source-revisions.txt"
           APK="$(find engine/src/out/android_Debug_arm/apks -maxdepth 1 -type f -name '*.apk' -print -quit)"
-          test -n "$APK"
+          test -n "$APK" || { echo "::error::No APK was produced"; exit 1; }
+          command -v unzip
+          unzip -t "$APK" >/dev/null
+          unzip -Z1 "$APK" | grep -Eq '^lib/arm64-v8a/[^/]+\\.so
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zorvi-upstream-brave-arm64-debug
+          path: engine-artifacts/
+          if-no-files-found: error
+          retention-days: 7
+ || {
+            echo "::error::APK does not contain ARM64 native libraries"
+            exit 1
+          }
           cp "$APK" "$GITHUB_WORKSPACE/engine-artifacts/"
+          (
+            cd "$GITHUB_WORKSPACE/engine-artifacts"
+            sha256sum "$(basename "$APK")" | tee apk-sha256.txt
+          )
 
       - uses: actions/upload-artifact@v4
         with:
