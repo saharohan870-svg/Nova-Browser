@@ -258,8 +258,8 @@ internal data class HtmlDocument(
                         cursor++
                     }
                 }
-                val selfClosing = trimmed.endsWith("/")
-                if (name !in voidTags && !selfClosing) {
+                // In HTML namespace, a trailing slash does not self-close non-void elements.
+                if (name !in voidTags) {
                     if (stack.size < MAX_TREE_DEPTH) stack += node else nestingLimitReached = true
                 }
             }
