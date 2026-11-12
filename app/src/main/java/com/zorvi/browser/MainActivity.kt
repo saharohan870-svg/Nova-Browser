@@ -133,6 +133,7 @@ class MainActivity : Activity() {
         controls.addView(button("Downloads") { showDownloads() })
         controls.addView(button("PiP") { enterPip() })
         controls.addView(button("Zorvi") { openInZorvi() })
+        controls.addView(button("VPN") { showVpnStatus() })
         controls.addView(button("Private") { togglePrivate() })
         controls.addView(button(if (guestMode) "End Guest" else "Guest Mode") { if (guestMode) endGuestMode() else startGuestMode() })
         controls.addView(button("☾") { dark = !dark; applyTheme() })
@@ -1198,13 +1199,26 @@ class MainActivity : Activity() {
         newTab("about:blank")
     }
 
+    private fun showVpnStatus() {
+        AlertDialog.Builder(this).setTitle("Nova VPN")
+            .setMessage("Not configured. Nova has no VPN provider, server endpoint, credentials, or tunnel SDK connected yet. Your internet traffic is not protected by a Nova VPN.\n\nThe Android VPN permission alone cannot provide VPN servers or route traffic.")
+            .setPositiveButton("OK", null).show()
+    }
+
+    private fun showGuestTorStatus() {
+        AlertDialog.Builder(this).setTitle("Tor in Guest Mode")
+            .setMessage("Tor is not installed in Nova yet. Guest Mode currently uses GeckoView private sessions only; it does not hide your IP address or route traffic through Tor. Guest browsing will not be described as Tor-protected until a Tor runtime and leak-tested routing are integrated.")
+            .setPositiveButton("OK", null).show()
+    }
+
     private fun startGuestMode() {
         if (guestMode) return
         guestReturnTab = current()
         privateMode = false
         guestMode = true
         newTab("about:blank")
-        Toast.makeText(this, "Guest Mode started. Temporary data is not saved. IP masking / Tor routing is not active.", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "Guest Mode started. Private session only; Tor routing is not configured.", Toast.LENGTH_LONG).show()
+        showGuestTorStatus()
         refreshGuestModeButton()
     }
 
