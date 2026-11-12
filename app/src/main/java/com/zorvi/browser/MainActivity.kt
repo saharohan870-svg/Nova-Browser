@@ -240,6 +240,7 @@ class MainActivity : Activity() {
                 .setPositiveButton("OK", null).show()
             return
         }
+        val permissionKeys = entries.map { it.key }
         val labels = entries.map { entry ->
             val parts = entry.key.removePrefix("site_permission_").split("_")
             val site = parts.dropLast(1).joinToString("_")
@@ -248,7 +249,7 @@ class MainActivity : Activity() {
         }.toTypedArray()
         AlertDialog.Builder(this).setTitle("Remembered site permissions")
             .setItems(labels) { _, index ->
-                val key = entries[index].key
+                val key = permissionKeys[index]
                 AlertDialog.Builder(this).setTitle(labels[index]).setMessage("Remove this saved decision? The site will ask again next time.")
                     .setPositiveButton("Forget") { _, _ -> prefs.edit().remove(key).apply(); showPermissionDashboard() }
                     .setNegativeButton("Keep", null).show()
@@ -387,7 +388,6 @@ class MainActivity : Activity() {
                             result.complete(value)
                         }
                         .setOnCancelListener { result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY) }.create()
-                    dialog.setOnShowListener { perm.notifyShown() }
                     dialog.show()
                 }
                 return result
