@@ -17,8 +17,8 @@ An Android browser prototype with a Chrome-inspired interface, powered by Mozill
 - Quick links for Google, YouTube, GitHub, Instagram, Discord, WhatsApp Web and Microsoft 365
 - Dark browser toolbar theme
 - Custom home page and Home shortcut
-- AI assistant with Perplexity, ChatGPT and optional local GGUF model choices
-- Native page-text extraction for summaries; summaries can run locally when a GGUF model is installed, or be handed to a selected online AI provider
+- Online AI assistant links for Perplexity and ChatGPT
+- Native page-text extraction for summaries, sent to a selected online AI provider
 - Reader mode with extracted text, font-size and theme controls
 - On-device translation for supported Google ML Kit language pairs after model download
 - Bundled GeckoView WebExtension for request-level blocking of a conservative curated set of ad/tracker domains, plus basic cosmetic hiding
@@ -37,4 +37,4 @@ Open this repository in Android Studio, allow Gradle sync, then run the `app` co
 
 ## Known limitations
 
-This is not a full Chromium distribution. GeckoView is a separate Firefox/Gecko engine; it does not guarantee identical Chromium behavior or every site's support. The experimental Zorvi renderer is not standards-complete and is not intended for modern AI web apps. The bundled blocker uses a small curated host list—not EasyList/uBlock filter syntax—and is not a comprehensive ad blocker. Cosmetic selectors are intentionally conservative and may miss ads or hide some site elements. Local AI requires the user to import a compatible GGUF model; model files are copied into Nova's app-private storage and consume device storage/RAM. The current offline AI interface is basic and needs device/performance testing.
+This is not a full Chromium distribution. GeckoView is a separate Firefox/Gecko engine; it does not guarantee identical Chromium behavior or every site's support. The experimental Zorvi renderer is not standards-complete and is not intended for modern AI web apps. The bundled blocker uses a small curated host list—not EasyList/uBlock filter syntax—and is not a comprehensive ad blocker. Cosmetic selectors are intentionally conservative and may miss ads or hide some site elements.
