@@ -76,6 +76,8 @@ class MainActivity : Activity() {
         override fun onStateChange(newState: Tunnel.State) { wireGuardConnected = newState == Tunnel.State.UP }
     }
     private val prefs by lazy { getSharedPreferences("zorvi", Context.MODE_PRIVATE) }
+    private val novaAuth by lazy { NovaAuth(applicationContext) }
+    private val firebaseAuth get() = novaAuth.auth
     private val engines = listOf("Google", "Bing", "DuckDuckGo", "Brave Search")
     private val runtime: GeckoRuntime by lazy { getOrCreateRuntime() }
 
@@ -138,6 +140,7 @@ class MainActivity : Activity() {
             setOnClickListener { showTabs() }
         }
         controls.addView(tabsLabel)
+        controls.addView(button(accountButtonLabel()) { showAccount() })
         controls.addView(button("AI Sites") { showCompatibilitySites(true) })
         controls.addView(button("Sites") { showCompatibilitySites(false) })
         controls.addView(button("Desktop") { toggleDesktopMode() })
@@ -163,6 +166,193 @@ class MainActivity : Activity() {
         })
         setContentView(root)
         applyTheme()
+    }
+
+
+    private fun accountButtonLabel(): String {
+        val user = novaAuth.auth?.currentUser
+        return if (user == null) "Account" else "Account ✓"
+    }
+
+    private fun showAccount() {
+        val auth = firebaseAuth
+        if (auth == null) {
+            AlertDialog.Builder(this).setTitle("Nova account setup required")
+                .setMessage("Email login is implemented with Firebase Authentication, but this build has no Firebase project configuration yet. Add the Firebase API key, Android App ID and Project ID to NovaFirebaseConfig.kt, then enable Email/Password in Firebase Console.")
+                .setPositiveButton("OK", null).show()
+            return
+        }
+        val user = auth.currentUser
+        if (user != null) {
+            val verification = if (user.isEmailVerified) "Email verified" else "Email not verified"
+            val dialog = AlertDialog.Builder(this)
+                .setTitle("Nova account")
+                .setMessage("${user.email.orEmpty()}\\n$verification")
+                .setPositiveButton("Sign out") { _, _ ->
+                    auth.signOut()
+                    refreshAccountButton()
+                    Toast.makeText(this, "Signed out", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("Close", null)
+            if (!user.isEmailVerified) {
+                dialog.setNeutralButton("Resend verification") { _, _ ->
+                    user.sendEmailVerification().addOnCompleteListener(this) { task ->
+                        Toast.makeText(this,
+                            if (task.isSuccessful) "Verification email sent" else "Could not send verification email: ${task.exception?.localizedMessage ?: "try again"}",
+                            Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            dialog.show()
+            return
+        }
+        showAuthForm()
+    }
+
+    private fun refreshAccountButton() {
+        if (!::root.isInitialized || root.childCount < 2) return
+        val controls = (root.getChildAt(1) as? HorizontalScrollView)?.getChildAt(0) as? LinearLayout ?: return
+        for (i in 0 until controls.childCount) {
+            val child = controls.getChildAt(i)
+            if (child is Button && (child.text == "Account" || child.text == "Account ✓")) {
+                child.text = accountButtonLabel()
+                break
+            }
+        }
+    }
+
+    private fun showAuthForm() {
+        val auth = firebaseAuth ?: return
+        val email = EditText(this).apply {
+            hint = "Email address"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+            isSingleLine = true
+        }
+        val password = EditText(this).apply {
+            hint = "Password (at least 8 characters)"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            isSingleLine = true
+        }
+        val confirm = EditText(this).apply {
+            hint = "Confirm password (for new account)"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            isSingleLine = true
+        }
+        val fields = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(28, 8, 28, 0)
+            addView(email)
+            addView(password)
+            addView(confirm)
+        }
+        val dialog = AlertDialog.Builder(this).setTitle("Sign in to Nova")
+            .setMessage("Use your email and password, or create a new Nova account.")
+            .setView(fields)
+            .setPositiveButton("Sign in", null)
+            .setNeutralButton("Create account", null)
+            .setNegativeButton("Forgot password", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val address = email.text.toString().trim()
+                val secret = password.text.toString()
+                if (!android.util.Patterns.EMAIL_ADDRESS.matcher(address).matches() || secret.isBlank()) {
+                    email.error = if (address.isBlank()) "Enter your email" else "Enter a valid email"
+                    if (secret.isBlank()) password.error = "Enter your password"
+                    return@setOnClickListener
+                }
+                setAuthBusy(dialog, true)
+                auth.signInWithEmailAndPassword(address, secret).addOnCompleteListener(this) { task ->
+                    if (task.isSuccessful) {
+                        val signedIn = auth.currentUser
+                        if (signedIn != null && !signedIn.isEmailVerified) {
+                            signedIn.sendEmailVerification().addOnCompleteListener(this) {
+                                auth.signOut()
+                                refreshAccountButton()
+                                dialog.dismiss()
+                                AlertDialog.Builder(this).setTitle("Verify your email")
+                                    .setMessage("We sent a verification link to $address. Open it, then sign in again.")
+                                    .setPositiveButton("OK", null).show()
+                            }
+                        } else {
+                            dialog.dismiss()
+                            refreshAccountButton()
+                            Toast.makeText(this, "Welcome back to Nova", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        setAuthBusy(dialog, false)
+                        showAuthError("Sign-in failed", task.exception)
+                    }
+                }
+            }
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                val address = email.text.toString().trim()
+                val secret = password.text.toString()
+                val repeated = confirm.text.toString()
+                if (!android.util.Patterns.EMAIL_ADDRESS.matcher(address).matches()) {
+                    email.error = "Enter a valid email"; return@setOnClickListener
+                }
+                if (secret.length < 8) {
+                    password.error = "Use at least 8 characters"; return@setOnClickListener
+                }
+                if (secret != repeated) {
+                    confirm.error = "Passwords do not match"; return@setOnClickListener
+                }
+                setAuthBusy(dialog, true)
+                auth.createUserWithEmailAndPassword(address, secret).addOnCompleteListener(this) { task ->
+                    if (task.isSuccessful) {
+                        val created = auth.currentUser
+                        if (created == null) {
+                            setAuthBusy(dialog, false)
+                            showAuthError("Account creation failed", null)
+                        } else {
+                            created.sendEmailVerification().addOnCompleteListener(this) { verification ->
+                                auth.signOut()
+                                refreshAccountButton()
+                                dialog.dismiss()
+                                AlertDialog.Builder(this).setTitle(if (verification.isSuccessful) "Verify your email" else "Account created")
+                                    .setMessage(if (verification.isSuccessful) "A verification link was sent to $address. Verify your address before signing in." else "Your account was created, but the verification email could not be sent. Try signing in and resend verification.")
+                                    .setPositiveButton("OK", null).show()
+                            }
+                        }
+                    } else {
+                        setAuthBusy(dialog, false)
+                        showAuthError("Could not create account", task.exception)
+                    }
+                }
+            }
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
+                val address = email.text.toString().trim()
+                if (!android.util.Patterns.EMAIL_ADDRESS.matcher(address).matches()) {
+                    email.error = "Enter your account email"; return@setOnClickListener
+                }
+                setAuthBusy(dialog, true)
+                auth.sendPasswordResetEmail(address).addOnCompleteListener(this) { task ->
+                    dialog.dismiss()
+                    Toast.makeText(this,
+                        if (task.isSuccessful) "If an account exists, a password-reset email has been sent." else "Could not send reset email. Check the address and try again.",
+                        Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun setAuthBusy(dialog: AlertDialog, busy: Boolean) {
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.isEnabled = !busy
+        dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.isEnabled = !busy
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.isEnabled = !busy
+    }
+
+    private fun showAuthError(title: String, error: Exception?) {
+        val message = when (error) {
+            is com.google.firebase.auth.FirebaseAuthWeakPasswordException -> "Choose a stronger password."
+            is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException -> "The email or password is invalid."
+            is com.google.firebase.auth.FirebaseAuthUserCollisionException -> "An account already exists for this email. Try signing in."
+            is com.google.firebase.auth.FirebaseNetworkException -> "Network error. Check your connection and try again."
+            else -> error?.localizedMessage?.take(240) ?: "Please try again."
+        }
+        AlertDialog.Builder(this).setTitle(title).setMessage(message).setPositiveButton("OK", null).show()
     }
 
     private fun button(label: String, action: () -> Unit) = Button(this).apply {
