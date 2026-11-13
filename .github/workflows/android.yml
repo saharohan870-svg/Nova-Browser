@@ -43,6 +43,7 @@ jobs:
       - name: Validate ad-block extension
         run: |
           node --check app/src/main/assets/adblock/background.js
+          node --check app/src/main/assets/adblock/popup-guard.js
           python3 -m json.tool app/src/main/assets/adblock/manifest.json > /dev/null
       - name: Build and test debug APK
         run: gradle testDebugUnitTest assembleDebug --stacktrace
