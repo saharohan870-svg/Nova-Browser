@@ -1,0 +1,24 @@
+{
+  "manifest_version": 2,
+  "name": "Zorvi Filter Engine",
+  "version": "1.0.0",
+  "description": "Network request blocking using EasyList and EasyPrivacy domain rules.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "zorvi-filter-engine@zorvi.browser",
+      "strict_min_version": "78.0"
+    }
+  },
+  "permissions": [
+    "webRequest",
+    "webRequestBlocking",
+    "storage",
+    "<all_urls>"
+  ],
+  "background": {
+    "scripts": [
+      "background.js"
+    ],
+    "persistent": true
+  }
+}
