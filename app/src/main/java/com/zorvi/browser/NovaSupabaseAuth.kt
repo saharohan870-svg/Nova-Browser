@@ -162,8 +162,10 @@ internal class NovaSupabaseAuth(context: Context) {
             requestMethod = method
             connectTimeout = 15000
             readTimeout = 15000
+            // Publishable API keys are not JWTs: send them only as apikey.
+            // Authorization is reserved for a real Supabase user access token.
             setRequestProperty("apikey", NovaSupabaseConfig.ANON_KEY)
-            setRequestProperty("Authorization", "Bearer " + (bearer ?: NovaSupabaseConfig.ANON_KEY))
+            if (!bearer.isNullOrBlank()) setRequestProperty("Authorization", "Bearer $bearer")
             setRequestProperty("Accept", "application/json")
             if (body != null) {
                 doOutput = true
@@ -197,6 +199,11 @@ internal class NovaSupabaseAuth(context: Context) {
      */
     private class SecureSessionStore(private val prefs: SharedPreferences) {
         private val alias = "nova.supabase.session.v1"
+
+        init {
+            // Remove legacy plaintext session fields from pre-secure builds.
+            prefs.edit().remove("access_token").remove("refresh_token").remove("email").apply()
+        }
 
         @Synchronized fun read(): JSONObject? {
             val encrypted = prefs.getString("session_enc", null) ?: return null
