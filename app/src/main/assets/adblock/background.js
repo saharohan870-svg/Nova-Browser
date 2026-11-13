@@ -71,7 +71,7 @@ browser.webRequest.onBeforeRequest.addListener(
     }
     return {};
   },
-  { urls: ["<all_urls>"], types: ["script", "image", "stylesheet", "object", "xmlhttprequest", "sub_frame", "media", "font", "other"] },
+  { urls: ["<all_urls>"], types: ["main_frame", "sub_frame", "script", "image", "stylesheet", "object", "xmlhttprequest", "media", "font", "other"] },
   ["blocking"]
 );
 
