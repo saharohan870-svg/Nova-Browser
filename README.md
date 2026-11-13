@@ -14,15 +14,21 @@ An Android browser powered by Mozilla GeckoView (the Gecko engine used by Firefo
 
 - Search/address bar with Google, Bing, DuckDuckGo and Brave Search
 - Back, forward, reload, bookmarks and history
-- Multiple GeckoView tabs, named tab groups and private sessions
+- Multiple GeckoView tabs, named tab groups, private sessions, and restoration of normal tabs/groups after restart (private tabs are excluded)
 - Chrome-style mobile user-agent compatibility mode
 
 ## Current implementation status
 
-- **Available in the normal browser shell:** GeckoView page rendering, address/search input, Google/Bing/DuckDuckGo/Brave Search selection, back/forward/reload, tab switching, basic named tab groups, bookmarks, URL history, private GeckoView sessions, dark toolbar theme, and a VPN shortcut that opens Android's VPN settings.
-- **Not implemented yet:** browser download manager, full ad-blocking filter lists/element hiding, AI assistant, Google/GitHub account linking, Codespaces integration, saved-tab restore, production release signing, or a bundled/embedded VPN client. For Turbo VPN, install and connect its Android app separately; Android routes browser traffic through the active system VPN. Zorvi does not control Turbo VPN servers, connection state, or subscription.
+- **Available in the normal browser shell:** GeckoView page rendering, address/search input, Google/Bing/DuckDuckGo/Brave Search selection, back/forward/reload, tab switching, basic named tab groups, bookmarks, URL history, private GeckoView sessions, dark toolbar theme, a VPN shortcut that opens Android VPN settings, and restoration of normal tabs/groups after restart. Private tabs are not serialized into the restore file.
+- **Not implemented yet:** an in-app download manager, custom ad-block filter lists/element hiding, an embedded AI assistant, Google/GitHub OAuth account linking, Codespaces integration, and production release signing. GeckoView tracking protection is enabled but is not equivalent to full Brave Shields. The release workflow is configured to build/test and publish an ARM64 APK when a `v*` tag is pushed; no signed production release is claimed until signing credentials are configured. For Turbo VPN, install and connect its Android app separately; Android routes browser traffic through the active system VPN. Zorvi does not control Turbo VPN servers, connection state, or subscription.
 - **Experimental Zorvi renderer:** a separate text-oriented prototype, not suitable as a general-purpose daily browser. It does not yet render ordinary modern sites reliably.
-- **APK packaging:** CI targets ARM64 Android phones. A successful Gradle compile alone is not a release; the workflow must also pass APK validation and upload the artifact.
+- **APK packaging:** CI targets ARM64 Android phones. The standard workflow validates and uploads a debug APK artifact. The release workflow publishes a GitHub Release on a `v*` tag after tests and APK validation. Debug APKs are not production-signed.
+
+## Privacy and cloud architecture
+
+- Normal page loading remains local to the device and GeckoView; page contents are not sent to a cloud AI service by default.
+- Private-tab URLs are excluded from saved-session restoration and normal browsing history.
+- Codespaces and OAuth require the repository owner to configure and authorize their own credentials. No API keys or secrets are committed to this repository.
 
 ## Build
 
