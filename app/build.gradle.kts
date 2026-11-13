@@ -42,6 +42,9 @@ dependencies {
     // Mozilla GeckoView stable artifact; this exact release is published on Mozilla Maven.
     implementation("org.mozilla.geckoview:geckoview:128.0.20240725162350")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("androidx.credentials:credentials:1.5.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.5.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
     // Retain the standalone JavaScript engine prototype alongside GeckoView.
     implementation("io.github.dokar3:quickjs-kt-android:1.0.0-alpha13")
     testImplementation("junit:junit:4.13.2")
