@@ -266,12 +266,17 @@ class MainActivity : Activity() {
                     if (task.isSuccessful) {
                         val signedIn = auth.currentUser
                         if (signedIn != null && !signedIn.isEmailVerified) {
-                            signedIn.sendEmailVerification().addOnCompleteListener(this) {
+                            signedIn.sendEmailVerification().addOnCompleteListener(this) { verification ->
                                 auth.signOut()
                                 refreshAccountButton()
                                 dialog.dismiss()
+                                val message = if (verification.isSuccessful) {
+                                    "We sent a verification link to $address. Open it, then sign in again."
+                                } else {
+                                    "This account is not verified. We could not send the verification email just now. Check your connection and try again."
+                                }
                                 AlertDialog.Builder(this).setTitle("Verify your email")
-                                    .setMessage("We sent a verification link to $address. Open it, then sign in again.")
+                                    .setMessage(message)
                                     .setPositiveButton("OK", null).show()
                             }
                         } else {
