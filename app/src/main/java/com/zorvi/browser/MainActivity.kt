@@ -1303,6 +1303,10 @@ class MainActivity : Activity() {
     }
 
     private fun showDownloads() {
+        if (current()?.guest == true) {
+            Toast.makeText(this, "Downloads are hidden in Guest Mode.", Toast.LENGTH_SHORT).show()
+            return
+        }
         val manager = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
         val ids = runCatching { JSONArray(prefs.getString("download_ids", "[]")) }.getOrDefault(JSONArray())
         val entries = mutableListOf<Long>()
@@ -1748,6 +1752,10 @@ class MainActivity : Activity() {
     }
 
     private fun showSavedList(history: Boolean) {
+        if (current()?.guest == true) {
+            Toast.makeText(this, "Personal history and bookmarks are hidden in Guest Mode.", Toast.LENGTH_SHORT).show()
+            return
+        }
         val key = if (history) "history" else "bookmarks"
         val list = JSONArray(prefs.getString(key, "[]"))
         val entries = (0 until list.length()).map { list.optString(it) }.reversed()
