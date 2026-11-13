@@ -19,8 +19,8 @@ An Android browser powered by Mozilla GeckoView (the Gecko engine used by Firefo
 
 ## Current implementation status
 
-- **Available in the normal browser shell:** GeckoView page rendering, address/search input, Google/Bing/DuckDuckGo/Brave Search selection, back/forward/reload, tab switching, basic named tab groups, bookmarks, URL history, private GeckoView sessions and dark toolbar theme.
-- **Not implemented yet:** browser download manager, full ad-blocking filter lists/element hiding, AI assistant, Google/GitHub account linking, Codespaces integration, saved-tab restore and production release signing.
+- **Available in the normal browser shell:** GeckoView page rendering, address/search input, Google/Bing/DuckDuckGo/Brave Search selection, back/forward/reload, tab switching, basic named tab groups, bookmarks, URL history, private GeckoView sessions, dark toolbar theme, and a VPN shortcut that opens Android's VPN settings.
+- **Not implemented yet:** browser download manager, full ad-blocking filter lists/element hiding, AI assistant, Google/GitHub account linking, Codespaces integration, saved-tab restore, production release signing, or a bundled/embedded VPN client. For Turbo VPN, install and connect its Android app separately; Android routes browser traffic through the active system VPN. Zorvi does not control Turbo VPN servers, connection state, or subscription.
 - **Experimental Zorvi renderer:** a separate text-oriented prototype, not suitable as a general-purpose daily browser. It does not yet render ordinary modern sites reliably.
 - **APK packaging:** CI targets ARM64 Android phones. A successful Gradle compile alone is not a release; the workflow must also pass APK validation and upload the artifact.
 
