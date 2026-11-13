@@ -78,6 +78,7 @@ class MainActivity : Activity() {
     }
     private val prefs by lazy { getSharedPreferences("zorvi", Context.MODE_PRIVATE) }
     private val novaAuth by lazy { NovaSupabaseAuth(applicationContext) }
+    private val cloudSync by lazy { NovaCloudSync(prefs, novaAuth) }
     private val engines = listOf("Google", "Bing", "DuckDuckGo", "Brave Search")
     private val torController by lazy { NovaTorController(applicationContext) }
     private val runtime: GeckoRuntime get() = getOrCreateRuntime(applicationContext)
@@ -86,7 +87,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         dark = prefs.getBoolean("dark_mode", false)
         buildUi()
-        novaAuth.restoreSession { refreshAccountButton() }
+        novaAuth.restoreSession { restored -> refreshAccountButton(); if (restored) syncCloud(showMessage = false) }
         applyCookiePolicy()
         restoreTabs()
         if (tabs.isEmpty()) newTab(homePage())
@@ -189,7 +190,8 @@ class MainActivity : Activity() {
         if (email != null) {
             AlertDialog.Builder(this).setTitle("Nova account")
                 .setMessage(email)
-                .setPositiveButton("Sign out") { _, _ ->
+                .setPositiveButton("Sync now") { _, _ -> syncCloud(showMessage = true) }
+                .setNeutralButton("Sign out") { _, _ ->
                     novaAuth.signOut {
                         runOnUiThread {
                             refreshAccountButton()
@@ -198,6 +200,24 @@ class MainActivity : Activity() {
                     }
                 }.setNegativeButton("Close", null).show()
         } else showAuthForm()
+    }
+
+    private fun syncCloud(showMessage: Boolean) {
+        if (guestMode || novaAuth.currentEmail() == null) return
+        saveTabs()
+        cloudSync.sync { ok, message ->
+            if (ok) {
+                tabs.toList().forEach { tab ->
+                    tab.view.releaseSession()
+                    if (tab.session.isOpen) tab.session.close()
+                }
+                tabs.clear()
+                active = 0
+                restoreTabs()
+                if (tabs.isEmpty()) newTab(homePage())
+            }
+            if (showMessage || !ok) Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun refreshAccountButton() {
@@ -266,6 +286,7 @@ class MainActivity : Activity() {
                     runOnUiThread {
                         if (ok) {
                             dialog.dismiss(); refreshAccountButton()
+                            syncCloud(showMessage = true)
                             Toast.makeText(this, "Welcome back to Nova", Toast.LENGTH_SHORT).show()
                         } else {
                             setAuthBusy(dialog, false)
@@ -332,6 +353,7 @@ class MainActivity : Activity() {
                     runOnUiThread {
                         if (ok) {
                             dialog.dismiss(); refreshAccountButton()
+                            syncCloud(showMessage = true)
                             Toast.makeText(this, "Signed in to Nova", Toast.LENGTH_LONG).show()
                         } else {
                             dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = true
@@ -1804,6 +1826,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         current()?.session?.setActive(true)
+        if (!guestMode && novaAuth.currentEmail() != null) syncCloud(showMessage = false)
     }
 
     override fun onPause() {
