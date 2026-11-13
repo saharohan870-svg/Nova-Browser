@@ -56,7 +56,7 @@ internal class NovaCloudSync(
                     val remoteRow = if (rows != null && rows.length() > 0) rows.optJSONObject(0) else null
                     val remote = remoteRow?.optJSONObject("snapshot")
                     val remoteUpdatedAt = runCatching {
-                        Instant.parse(remoteRow?.optString("updated_at")).toEpochMilli()
+                        Instant.parse(remoteRow?.optString("updated_at").orEmpty()).toEpochMilli()
                     }.getOrDefault(0L)
                     val localDirtyAt = preferences.getLong("_nova_cloud_dirty_at", 0L)
                     val merged = if (remote == null) local else mergeSnapshots(remote, local, localDirtyAt > remoteUpdatedAt)
