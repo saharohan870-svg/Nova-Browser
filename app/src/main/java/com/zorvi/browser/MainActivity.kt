@@ -231,20 +231,65 @@ class MainActivity : Activity() {
     }
 
     private fun showTabs() {
-        val labels = tabs.mapIndexed { index, tab ->
-            (index + 1).toString() + ". " + (if (tab.isPrivate) "[Private] " else "") +
-                tab.title.take(48)
-        }.toMutableList()
-        labels.add("＋ New tab")
-        AlertDialog.Builder(this).setTitle("Zorvi tabs")
-            .setItems(labels.toTypedArray()) { _, which ->
-                if (which == tabs.size) newTab("https://www.google.com")
-                else { active = which; showOnlyActive(); updateTabs(); saveTabState() }
+        val groups = tabs.map { it.group }.distinct().sorted()
+        val options = mutableListOf("All tabs", "＋ New tab", "＋ New group")
+        options.addAll(groups.map { "▣ $it (${tabs.count { tab -> tab.group == it }})" })
+        AlertDialog.Builder(this).setTitle("Tab groups").setItems(options.toTypedArray()) { _, which ->
+            when (which) {
+                0 -> showTabsInGroup(null)
+                1 -> newTab("https://www.google.com")
+                2 -> createTabGroup()
+                else -> showTabsInGroup(options[which].substringAfter("▣ ").substringBeforeLast(" ("))
             }
-            .setNegativeButton("Close current") { _, _ -> closeTab() }
-            .show()
+        }.setNegativeButton("Close current tab") { _, _ -> closeTab() }.show()
     }
 
+    private var dialogTabs: AlertDialog? = null
+
+    private fun showTabsInGroup(group: String?) {
+        val visibleTabs = tabs.withIndex().filter { group == null || it.value.group == group }
+        val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(16, 8, 16, 8) }
+        val scroll = ScrollView(this)
+        visibleTabs.forEach { indexed ->
+            val tab = indexed.value
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            val select = Button(this).apply {
+                isAllCaps = false; textSize = 12f
+                text = (if (indexed.index == active) "● " else "") + (if (tab.isPrivate) "Private · " else "") + tab.title.take(28) + "\n" + tab.group
+                layoutParams = LinearLayout.LayoutParams(0, 56, 1f)
+                setOnClickListener { active = tabs.indexOf(tab); showOnlyActive(); updateTabs(); saveTabState(); address.setText(tab.url); dialogTabs?.dismiss() }
+            }
+            val move = Button(this).apply { text = "Move"; isAllCaps = false; setOnClickListener { showMoveTabDialog(tab, group) } }
+            val close = Button(this).apply { text = "×"; isAllCaps = false; setOnClickListener { val p = tabs.indexOf(tab); if (p >= 0) closeTabAt(p); dialogTabs?.dismiss(); showTabsInGroup(group) } }
+            row.addView(select); row.addView(move); row.addView(close); panel.addView(row)
+        }
+        scroll.addView(panel)
+        dialogTabs = AlertDialog.Builder(this).setTitle(group ?: "All tabs").setView(scroll)
+            .setPositiveButton("New tab") { _, _ -> newTab("https://www.google.com", group) }
+            .setNeutralButton("Manage groups") { _, _ -> showTabs() }.setNegativeButton("Done", null).show()
+    }
+
+    private fun createTabGroup() {
+        val input = EditText(this).apply { hint = "Group name"; setSingleLine(true) }
+        AlertDialog.Builder(this).setTitle("Create tab group").setView(input)
+            .setPositiveButton("Create") { _, _ ->
+                val name = input.text.toString().trim().take(24)
+                if (name.isNotEmpty()) { activeTab()?.group = name; saveTabState(); updateTabs(); Toast.makeText(this, "Tab moved to $name", Toast.LENGTH_SHORT).show() }
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun showMoveTabDialog(tab: BrowserTab, returnGroup: String?) {
+        val groups = (tabs.map { it.group }.distinct() + "＋ Create new group").distinct()
+        AlertDialog.Builder(this).setTitle("Move tab to group").setItems(groups.toTypedArray()) { _, which ->
+            if (groups[which] == "＋ Create new group") {
+                val input = EditText(this).apply { hint = "Group name"; setSingleLine(true) }
+                AlertDialog.Builder(this).setTitle("New group").setView(input).setPositiveButton("Create") { _, _ ->
+                    input.text.toString().trim().take(24).takeIf { it.isNotEmpty() }?.let { tab.group = it }
+                    saveTabState(); dialogTabs?.dismiss(); showTabsInGroup(returnGroup)
+                }.setNegativeButton("Cancel", null).show()
+            } else { tab.group = groups[which]; saveTabState(); dialogTabs?.dismiss(); showTabsInGroup(returnGroup) }
+        }.setNegativeButton("Cancel", null).show()
+    }
     private fun assignTabGroup() {
         val tab = activeTab() ?: return
         val existing = tabs.map { it.group }.distinct().toMutableList()
@@ -280,22 +325,19 @@ class MainActivity : Activity() {
             .show()
     }
 
-    private fun closeTab() {
-        if (tabs.isEmpty()) return
-        if (tabs.size == 1) {
-            activeSession()?.loadUri("about:blank")
-            address.setText("")
-            return
-        }
-        val removed = tabs.removeAt(active)
-        removed.session.close()
-        removed.view.releaseSession()
-        active = active.coerceAtMost(tabs.lastIndex)
-        saveTabState()
-        showOnlyActive()
-        updateTabs()
-    }
+    private fun closeTab() { closeTabAt(active) }
 
+    private fun closeTabAt(position: Int) {
+        if (position !in tabs.indices) return
+        if (tabs.size == 1) {
+            tabs[0].session.loadUri("about:blank"); tabs[0].url = "about:blank"; tabs[0].title = "New tab"
+            address.setText(""); saveTabState(); return
+        }
+        val removed = tabs.removeAt(position)
+        removed.session.close(); removed.view.releaseSession()
+        if (position < active) active-- else if (position == active) active = active.coerceAtMost(tabs.lastIndex)
+        saveTabState(); showOnlyActive(); updateTabs()
+    }
 
     private var adBlockReady = false
 
