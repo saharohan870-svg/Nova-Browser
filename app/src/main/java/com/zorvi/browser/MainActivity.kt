@@ -79,6 +79,7 @@ class MainActivity : Activity() {
     private val prefs by lazy { getSharedPreferences("zorvi", Context.MODE_PRIVATE) }
     private val novaAuth by lazy { NovaSupabaseAuth(applicationContext) }
     private val cloudSync by lazy { NovaCloudSync(prefs, novaAuth) }
+    private val encryptedVaultSync by lazy { NovaEncryptedVaultSync(novaAuth) }
     private val engines = listOf("Google", "Bing", "DuckDuckGo", "Brave Search")
     private val torController by lazy { NovaTorController(applicationContext) }
     private val runtime: GeckoRuntime get() = getOrCreateRuntime(applicationContext)
@@ -138,6 +139,7 @@ class MainActivity : Activity() {
         controls.addView(button("★") { bookmark() })
         controls.addView(button("Bookmarks") { showSavedList(false) })
         controls.addView(button("History") { showSavedList(true) })
+        controls.addView(button("Passwords") { showPasswordVault() })
         tabsLabel = TextView(this).apply {
             text = "Tabs 0"; gravity = Gravity.CENTER; setPadding(7, 12, 7, 12)
             setOnClickListener { showTabs() }
@@ -200,6 +202,160 @@ class MainActivity : Activity() {
                     }
                 }.setNegativeButton("Close", null).show()
         } else showAuthForm()
+    }
+
+    private fun showPasswordVault() {
+        if (guestMode || current()?.guest == true) {
+            Toast.makeText(this, "The password vault is unavailable in Guest Mode.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (novaAuth.currentEmail() == null) {
+            AlertDialog.Builder(this).setTitle("Sign in required")
+                .setMessage("Sign in to a Nova account to back up your encrypted password vault across devices.")
+                .setPositiveButton("Account") { _, _ -> showAccount() }
+                .setNegativeButton("Close", null).show()
+            return
+        }
+        AlertDialog.Builder(this).setTitle("Nova Password Vault")
+            .setMessage("Your passwords are encrypted on this device before anything is sent to Supabase. A separate sync passphrase is required on every device.")
+            .setPositiveButton("Unlock / create") { _, _ -> promptVaultPassphrase(false) }
+            .setNeutralButton("Restore from cloud") { _, _ -> promptVaultPassphrase(true) }
+            .setNegativeButton("Close", null).show()
+    }
+
+    private fun promptVaultPassphrase(restoreFromCloud: Boolean) {
+        val input = EditText(this).apply {
+            hint = "At least 12 characters"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        AlertDialog.Builder(this).setTitle("Vault sync passphrase")
+            .setMessage("This is separate from your Nova login. Nova cannot recover it. Use the same passphrase on every device.")
+            .setView(input)
+            .setPositiveButton(if (restoreFromCloud) "Decrypt and restore" else "Unlock") { _, _ ->
+                val passphrase = input.text.toString().toCharArray()
+                if (passphrase.size < 12) {
+                    passphrase.fill('\u0000')
+                    Toast.makeText(this, "Use at least 12 characters.", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+                if (restoreFromCloud) {
+                    val localPassphrase = passphrase.copyOf()
+                    encryptedVaultSync.restore(passphrase) { json, message ->
+                        if (json == null) {
+                            localPassphrase.fill('\u0000')
+                            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                        } else {
+                            try {
+                                val localEnvelope = NovaVaultCrypto.encrypt(json, localPassphrase)
+                                prefs.edit().putString("nova_vault_local", localEnvelope.toString()).apply()
+                                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                                showVaultEntries(json, localPassphrase.copyOf())
+                            } catch (error: Exception) {
+                                Toast.makeText(this, error.message ?: "Could not save the local encrypted vault.", Toast.LENGTH_LONG).show()
+                            } finally {
+                                localPassphrase.fill('\u0000')
+                            }
+                        }
+                    }
+                } else {
+                    val local = prefs.getString("nova_vault_local", null)
+                    if (local.isNullOrBlank()) {
+                        showVaultEntries("{\"entries\":[]}", passphrase)
+                    } else {
+                        try {
+                            val json = NovaVaultCrypto.decrypt(org.json.JSONObject(local), passphrase)
+                            showVaultEntries(json, passphrase.copyOf())
+                            passphrase.fill('\u0000')
+                        } catch (error: Exception) {
+                            passphrase.fill('\u0000')
+                            Toast.makeText(this, "Could not unlock the local vault. Check your sync passphrase.", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            }
+            .setNegativeButton("Cancel") { _, _ -> }
+            .show()
+    }
+
+    private fun showVaultEntries(vaultJson: String, passphrase: CharArray) {
+        val entries = try { org.json.JSONObject(vaultJson).optJSONArray("entries") ?: JSONArray() }
+        catch (_: Exception) { JSONArray() }
+        val labels = (0 until entries.length()).map { index ->
+            val item = entries.optJSONObject(index) ?: org.json.JSONObject()
+            "${item.optString("site", "Unknown site")} — ${item.optString("username")}"
+        }.toTypedArray()
+        AlertDialog.Builder(this).setTitle("Saved passwords (${entries.length()})")
+            .setItems(labels) { _, index ->
+                val item = entries.optJSONObject(index) ?: return@setItems
+                AlertDialog.Builder(this).setTitle(item.optString("site"))
+                    .setMessage("Username: ${item.optString("username")}\nPassword: ••••••••")
+                    .setPositiveButton("Copy password") { _, _ ->
+                        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Nova password", item.optString("password")))
+                        Toast.makeText(this, "Password copied. Clipboard contents may be visible to other apps.", Toast.LENGTH_LONG).show()
+                    }
+                    .setNeutralButton("Delete") { _, _ ->
+                        val updated = JSONArray()
+                        for (i in 0 until entries.length()) if (i != index) updated.put(entries.opt(i))
+                        saveVaultAndSync(updated, passphrase)
+                        showVaultEntries(org.json.JSONObject().put("entries", updated).toString(), passphrase.copyOf())
+                    }
+                    .setNegativeButton("Close", null).show()
+            }
+            .setPositiveButton("Add password") { _, _ -> showVaultEntryEditor(entries, passphrase) }
+            .setNeutralButton("Back up now") { _, _ ->
+                saveVaultAndSync(entries, passphrase)
+                Toast.makeText(this, "Encrypted vault backup started.", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Close") { _, _ -> passphrase.fill('\u0000') }
+            .show()
+    }
+
+    private fun showVaultEntryEditor(entries: JSONArray, passphrase: CharArray) {
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 12, 32, 4)
+        }
+        fun field(hintText: String, password: Boolean = false): EditText =
+            EditText(this).apply {
+                hint = hintText
+                if (password) inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            }
+        val site = field("Website (https://example.com)")
+        val username = field("Username or email")
+        val password = field("Password", true)
+        form.addView(site); form.addView(username); form.addView(password)
+        AlertDialog.Builder(this).setTitle("Add password").setView(form)
+            .setPositiveButton("Save") { _, _ ->
+                if (site.text.isBlank() || password.text.isBlank()) {
+                    Toast.makeText(this, "Website and password are required.", Toast.LENGTH_LONG).show()
+                } else {
+                    val updated = JSONArray(entries.toString())
+                    updated.put(org.json.JSONObject()
+                        .put("site", site.text.toString().trim())
+                        .put("username", username.text.toString().trim())
+                        .put("password", password.text.toString()))
+                    saveVaultAndSync(updated, passphrase)
+                    showVaultEntries(org.json.JSONObject().put("entries", updated).toString(), passphrase.copyOf())
+                }
+            }
+            .setNegativeButton("Cancel") { _, _ -> passphrase.fill('\u0000') }
+            .show()
+    }
+
+    private fun saveVaultAndSync(entries: JSONArray, passphrase: CharArray) {
+        val json = org.json.JSONObject().put("entries", entries).toString()
+        try {
+            val localEnvelope = NovaVaultCrypto.encrypt(json, passphrase)
+            prefs.edit().putString("nova_vault_local", localEnvelope.toString()).apply()
+            encryptedVaultSync.backup(json, passphrase.copyOf()) { ok, message ->
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            }
+        } catch (error: Exception) {
+            Toast.makeText(this, error.message ?: "Could not encrypt the password vault.", Toast.LENGTH_LONG).show()
+        } finally {
+            passphrase.fill('\u0000')
+        }
     }
 
     private fun syncCloud(showMessage: Boolean) {
