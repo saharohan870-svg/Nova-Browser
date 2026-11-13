@@ -22,7 +22,7 @@ internal class NovaCloudSync(
         "bookmarks", "history", "open_tabs", "active_tab", "recently_closed",
         "engine", "dark_mode", "home_page", "reader_text_size", "reader_dark",
         "translation_language", "tracking_protection", "cookie_policy",
-        "desktop_mode", "active_group", "direct_downloads"
+        "desktop_mode", "active_group"
     )
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key != null && (key in syncedKeys || key.startsWith("site_permission_"))) {
@@ -109,7 +109,7 @@ internal class NovaCloudSync(
         val result = JSONObject()
         for (key in syncedKeys) {
             val value = preferences.all[key] ?: when (key) {
-                "bookmarks", "history", "open_tabs", "recently_closed", "direct_downloads" -> "[]"
+                "bookmarks", "history", "open_tabs", "recently_closed" -> "[]"
                 "active_tab", "engine", "reader_text_size", "cookie_policy" -> 0
                 "dark_mode", "reader_dark", "tracking_protection", "desktop_mode" -> false
                 else -> continue
