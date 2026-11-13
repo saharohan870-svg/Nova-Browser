@@ -64,3 +64,10 @@ Nova's Android account flow uses the Supabase Auth REST API directly. Firebase A
 6. After email templates are saved, build and install the APK. Test password sign-up and confirmation, password sign-in, email OTP sign-in, recovery OTP + password update, sign-out, and session restoration after force-closing/reopening Nova.
 
 The app encrypts its saved access and refresh tokens with an Android Keystore AES-GCM key. Publishable keys are sent only in the `apikey` header; the `Authorization` header is reserved for a real user access token.
+
+
+## Nova Cloud Sync
+
+Nova Cloud Sync uses the existing Supabase account. On sign-in, app startup, and app resume, Nova fetches the account's browser snapshot, merges bookmarks, history, open tabs, tab groups, pinned-tab state and recently closed tabs, then uploads the merged snapshot. Search engine, theme, home page, reader, translation, tracking-protection, cookie-policy, desktop-mode, direct-download and remembered website-permission preferences are included.
+
+The `public.nova_sync_state` table is protected by row-level security. Every row is owned by the authenticated Supabase user; the app sends the user access token and publishable key only. The Supabase service-role key is never shipped in the app. Android DownloadManager IDs, authentication tokens, private sessions and Tor Guest Mode data are excluded. Downloaded file contents remain on the device. This version does not sync saved website passwords, cookies/site login sessions, ad-blocker extension storage, or the actual downloaded files; those require separate secure implementations.
