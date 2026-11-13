@@ -125,7 +125,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-        controls.addView(button("＋") { newTab("https://www.google.com") })
+        controls.addView(button("＋") { newTab(homePage()) })
         controls.addView(button("←") { current()?.session?.goBack() })
         controls.addView(button("→") { current()?.session?.goForward() })
         controls.addView(button("↻") { current()?.session?.reload() })
@@ -168,7 +168,13 @@ class MainActivity : Activity() {
 
     private fun current(): Tab? = tabs.getOrNull(active)
 
-    private fun homePage(): String = prefs.getString("home_page", "https://www.google.com") ?: "https://www.google.com"
+    private fun homePage(): String {
+        val saved = prefs.getString("home_page", null)
+        // Migrate the previous built-in Google start page to the new Kali-themed start page.
+        return if (saved.isNullOrBlank() || saved == "https://www.google.com") {
+            "file:///android_asset/home.html"
+        } else saved
+    }
 
     private fun openHome() {
         current()?.session?.loadUri(homePage()) ?: newTab(homePage())
