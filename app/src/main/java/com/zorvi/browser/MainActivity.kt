@@ -36,6 +36,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         runtime = GeckoRuntime.create(this)
+        installAdBlocker()
         buildUi()
         val restored = BrowserTabState.decode(prefs.getString("saved_tabs", null))
         if (restored.first.isEmpty()) {
@@ -94,6 +95,7 @@ class MainActivity : Activity() {
         controls.addView(button("Bookmarks") { showSavedList(false) })
         controls.addView(button("History") { showSavedList(true) })
         controls.addView(button("Downloads") { showDownloads() })
+        controls.addView(button("AdBlock") { showAdBlockStatus() })
         tabsLabel = TextView(this).apply {
             text = "Tabs 0"
             gravity = Gravity.CENTER
@@ -292,6 +294,44 @@ class MainActivity : Activity() {
         saveTabState()
         showOnlyActive()
         updateTabs()
+    }
+
+
+    private var adBlockReady = false
+
+    private fun installAdBlocker() {
+        val controller = runtime.getWebExtensionController()
+        controller.ensureBuiltIn(
+            "resource://android/assets/adblock/",
+            "zorvi-filter-engine@zorvi.browser"
+        ).accept(
+            { extension ->
+                controller.setAllowedInPrivateBrowsing(extension, true)
+                adBlockReady = true
+                runOnUiThread {
+                    Toast.makeText(this, "Ad and tracker filter engine enabled", Toast.LENGTH_SHORT).show()
+                }
+            },
+            { error ->
+                android.util.Log.e("ZorviAdBlock", "Could not install filter engine", error)
+                runOnUiThread {
+                    Toast.makeText(this, "Ad blocker unavailable; Gecko tracking protection remains on", Toast.LENGTH_LONG).show()
+                }
+            }
+        )
+    }
+
+    private fun showAdBlockStatus() {
+        val message = if (adBlockReady) {
+            "Zorvi Filter Engine is active. It loads supported domain rules from EasyList and EasyPrivacy when internet is available, with a small offline fallback list. GeckoView tracking protection is also enabled. Some cosmetic, scriptlet and advanced filter rules are not supported yet."
+        } else {
+            "The filter engine has not finished installing. GeckoView tracking protection remains enabled."
+        }
+        AlertDialog.Builder(this)
+            .setTitle(if (adBlockReady) "Ad blocking: On" else "Ad blocking: Starting")
+            .setMessage(message)
+            .setPositiveButton("OK", null)
+            .show()
     }
 
     private fun openVpnSettings() {
