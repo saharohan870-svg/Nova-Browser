@@ -1,6 +1,6 @@
 # Nova Browser
 
-An Android browser prototype with a Chrome-inspired interface, powered by Mozilla GeckoView on the `chromium-engine-migration` branch. The separate Zorvi renderer remains experimental and is not the default web engine.
+An Android browser prototype with a Chrome-inspired interface, powered exclusively by Mozilla GeckoView.
 
 ## Current browser features
 
@@ -27,6 +27,10 @@ An Android browser prototype with a Chrome-inspired interface, powered by Mozill
 - Page-crash recovery actions and low-memory session handling
 - Close-other-tabs, duplicate, pin/unpin, tab search and recently closed tabs
 
+## Engine architecture
+
+Nova uses GeckoView as its only page-rendering engine. GeckoView supplies standards-based HTML, CSS, JavaScript, HTTP/HTTPS, TLS, image/font loading, accessibility integration, graphics compositing, and browser networking. Nova no longer maintains a second in-app HTML renderer or JavaScript engine. The former Zorvi prototype's standalone parser, layout, graphics, QuickJS, HTTP loader, and experimental page Activity are retired because they duplicated incomplete browser-engine functionality. Their security, caching, resource-loading, URL, and accessibility requirements remain Nova/GeckoView integration and regression-test requirements.
+
 ## Compatibility status
 
 The AI and major-site shortcuts are navigation conveniences, not compatibility certifications. Successful sign-in, streaming responses, voice, media, uploads and session restoration still require final testing on a real Android device. Phase 3 features are documented in [the Phase 3 progress log](docs/PHASE3_PROGRESS.md); some advanced features remain incomplete. See [the Phase 2 compatibility plan](docs/SEVEN_SITE_COMPATIBILITY_TEST_PLAN.md).
@@ -37,4 +41,4 @@ Open this repository in Android Studio, allow Gradle sync, then run the `app` co
 
 ## Known limitations
 
-This is not a full Chromium distribution. GeckoView is a separate Firefox/Gecko engine; it does not guarantee identical Chromium behavior or every site's support. The experimental Zorvi renderer is not standards-complete and is not intended for modern AI web apps. The bundled blocker implements a practical subset of Adblock Plus filter syntax for EasyList/EasyPrivacy. It does not yet support every uBlock Origin/ABP advanced feature (such as procedural cosmetic rules, redirects, scriptlets, CSP and all modifiers), so it is not feature-equivalent to uBlock Origin. Some site-specific ads may remain.
+This is not a full Chromium distribution. GeckoView is a separate Firefox/Gecko engine; it does not guarantee identical Chromium behavior or every site's support.  The bundled blocker implements a practical subset of Adblock Plus filter syntax for EasyList/EasyPrivacy. It does not yet support every uBlock Origin/ABP advanced feature (such as procedural cosmetic rules, redirects, scriptlets, CSP and all modifiers), so it is not feature-equivalent to uBlock Origin. Some site-specific ads may remain.

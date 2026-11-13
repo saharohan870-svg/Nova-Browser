@@ -2,7 +2,7 @@
 
 Status: feature implementation is present in the browser shell; final end-to-end and physical-device verification remains required.
 
-This track covers Nova Browser product features, separate from the independent Zorvi Engine graphics track.
+This track covers Nova Browser product features, with GeckoView providing the underlying page rendering and graphics.
 
 ## Implemented in the browser shell
 
@@ -33,4 +33,4 @@ This track covers Nova Browser product features, separate from the independent Z
 - [ ] Verify downloads on Android 10+ and storage failure handling.
 - [ ] Run CI unit tests and install the resulting ARM64 APK on a physical Android device.
 
-The feature list is not a claim that every website, language pair, or download type is fully supported.
+The feature list is not a claim that every website, language pair, or download type is fully supported. GeckoView is Nova's sole rendering engine; the experimental Zorvi renderer track has been retired.

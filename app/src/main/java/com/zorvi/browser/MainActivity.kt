@@ -148,7 +148,6 @@ class MainActivity : Activity() {
         controls.addView(button("Group") { manageGroups() })
         controls.addView(button("Downloads") { showDownloads() })
         controls.addView(button("PiP") { enterPip() })
-        controls.addView(button("Zorvi") { openInZorvi() })
         controls.addView(button("VPN") { showVpnStatus() })
         controls.addView(button("Private") { togglePrivate() })
         controls.addView(button(if (guestMode) "End Guest" else "Guest Mode") { if (guestMode) endGuestMode() else startGuestMode() })
@@ -806,12 +805,6 @@ class MainActivity : Activity() {
         }
         Toast.makeText(this, if (desktopMode) "Desktop site mode enabled" else "Mobile site mode enabled", Toast.LENGTH_SHORT).show()
     }
-    private fun openInZorvi() {
-        val target = current()?.url?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
-        if (target.isNullOrBlank()) return
-        startActivity(Intent(this, ZorviPageActivity::class.java).putExtra(ZorviPageActivity.EXTRA_URL, target))
-    }
-
     private fun updateTabs() {
         val pinnedCount = tabs.count { it.pinned }
         tabsLabel.text = "Tabs " + tabs.size + (if (pinnedCount > 0) " · Pinned " + pinnedCount else "") + " · " + (current()?.group ?: "—")
