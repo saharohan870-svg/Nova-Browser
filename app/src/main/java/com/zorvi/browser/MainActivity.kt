@@ -97,6 +97,7 @@ class MainActivity : Activity() {
         controls.addView(button("Downloads") { showDownloads() })
         controls.addView(button("AdBlock") { showAdBlockStatus() })
         controls.addView(button("AI") { showAiAssistant() })
+        controls.addView(button("Account") { showAccountCloud() })
         tabsLabel = TextView(this).apply {
             text = "Tabs 0"
             gravity = Gravity.CENTER
@@ -449,6 +450,105 @@ class MainActivity : Activity() {
         dialog.show()
         dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
     }
+    private val githubAccount by lazy { GitHubAccountManager(this) }
+
+    /** Account linking is optional; browsing remains fully local without an account. */
+    private fun showAccountCloud() {
+        if (githubAccount.isConnected()) {
+            Thread {
+                val summary = runCatching { githubAccount.accountSummary() }.getOrElse { "GitHub connected (profile unavailable)" }
+                runOnUiThread {
+                    AlertDialog.Builder(this)
+                        .setTitle("Zorvi account & cloud")
+                        .setMessage("GitHub: $summary\n\nCodespaces are optional and may incur GitHub charges. Zorvi will not start or create a Codespace automatically.")
+                        .setPositiveButton("List my Codespaces") { _, _ ->
+                            Thread {
+                                val result = runCatching { githubAccount.listCodespaces().ifEmpty { listOf("No Codespaces found") }.joinToString("\\n") }
+                                    .getOrElse { "Could not load Codespaces: ${it.message}" }
+                                runOnUiThread { AlertDialog.Builder(this).setTitle("Your Codespaces").setMessage(result).setPositiveButton("OK", null).show() }
+                            }.start()
+                        }
+                        .setNeutralButton("Disconnect") { _, _ ->
+                            githubAccount.disconnect()
+                            Toast.makeText(this, "GitHub disconnected", Toast.LENGTH_SHORT).show()
+                        }
+                        .setNegativeButton("Close", null).show()
+                }
+            }.start()
+            return
+        }
+        val clientId = EditText(this).apply {
+            hint = "GitHub OAuth App client ID"
+            setSingleLine(true)
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 8, 24, 8)
+            addView(TextView(this@MainActivity).apply {
+                text = "Connect GitHub using its device authorization flow. First create a GitHub OAuth App and enable Device Flow. Zorvi needs read:user, repo and codespace permissions to display your Codespaces. No Codespace is created or started."
+            })
+            addView(clientId)
+        }
+        AlertDialog.Builder(this).setTitle("Connect GitHub").setView(content)
+            .setPositiveButton("Get authorization code") { _, _ ->
+                val id = clientId.text.toString().trim()
+                if (id.isBlank()) {
+                    Toast.makeText(this, "Enter your GitHub OAuth App client ID", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+                Thread {
+                    val result = runCatching { githubAccount.requestDeviceCode(id) }
+                    runOnUiThread {
+                        result.onSuccess { code ->
+                            AlertDialog.Builder(this)
+                                .setTitle("Authorize Zorvi on GitHub")
+                                .setMessage("1. Open ${code.verificationUri}\n2. Enter this one-time code:\n\n${code.userCode}\n\nAfter authorizing, return here and tap Continue. The code expires in about ${code.expiresInSeconds / 60} minutes.")
+                                .setPositiveButton("Open GitHub") { _, _ ->
+                                    runCatching { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(code.verificationUri))) }
+                                    pollGitHubAuthorization(id, code)
+                                }
+                                .setNegativeButton("Cancel", null).show()
+                        }.onFailure {
+                            AlertDialog.Builder(this).setTitle("GitHub setup failed").setMessage(it.message ?: "Could not start authorization").setPositiveButton("OK", null).show()
+                        }
+                    }
+                }.start()
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun pollGitHubAuthorization(clientId: String, code: GitHubAccountManager.DeviceCode) {
+        AlertDialog.Builder(this).setTitle("Waiting for GitHub authorization")
+            .setMessage("Complete authorization in the browser. Zorvi will check after you tap Continue.")
+            .setPositiveButton("Continue") { _, _ ->
+                Thread {
+                    val deadline = System.currentTimeMillis() + code.expiresInSeconds * 1000L
+                    var interval = code.intervalSeconds.coerceAtLeast(5)
+                    var token: String? = null
+                    var failure: String? = null
+                    while (System.currentTimeMillis() < deadline && token == null && failure == null) {
+                        try {
+                            Thread.sleep(interval * 1000L)
+                            token = githubAccount.pollForToken(clientId, code.deviceCode)
+                        } catch (e: InterruptedException) {
+                            Thread.currentThread().interrupt()
+                            failure = "Authorization check was interrupted"
+                        } catch (e: Exception) {
+                            failure = e.message ?: "GitHub authorization failed"
+                        }
+                    }
+                    runOnUiThread {
+                        val message = when {
+                            token != null -> "GitHub account connected. Your token is encrypted using Android Keystore on this device."
+                            failure != null -> failure!!
+                            else -> "The authorization code expired. Start again to connect."
+                        }
+                        AlertDialog.Builder(this).setTitle(if (token != null) "Connected" else "Not connected")
+                            .setMessage(message).setPositiveButton("OK", null).show()
+                    }
+                }.start()
+            }.setNegativeButton("Cancel", null).show()
+    }
+
     private var adBlockReady = false
 
     private fun installAdBlocker() {
