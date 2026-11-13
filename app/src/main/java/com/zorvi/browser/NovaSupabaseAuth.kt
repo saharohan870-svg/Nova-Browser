@@ -105,6 +105,22 @@ internal class NovaSupabaseAuth(context: Context) {
         }
     }
 
+    /** Supplies a refreshed user access token to cloud features; never exposes the refresh token. */
+    fun withFreshAccessToken(callback: (String?) -> Unit) {
+        if (!isConfigured) {
+            mainHandler.post { callback(null) }
+            return
+        }
+        executor.execute {
+            val token = runCatching {
+                val session = sessionStore.read()
+                    ?: throw IllegalStateException("Sign in to your Nova account first.")
+                ensureFreshSession(session).optString("access_token").takeIf { it.isNotBlank() }
+            }.getOrNull()
+            mainHandler.post { callback(token) }
+        }
+    }
+
     private fun runAuth(
         path: String,
         body: JSONObject,
