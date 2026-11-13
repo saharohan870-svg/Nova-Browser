@@ -1839,6 +1839,10 @@ class MainActivity : Activity() {
     override fun onPause() {
         current()?.session?.setActive(false)
         saveTabs()
+        if (!guestMode && novaAuth.currentEmail() != null) {
+            // Best-effort background upload; next launch/resume downloads the latest account snapshot.
+            cloudSync.sync { _, _ -> }
+        }
         super.onPause()
     }
 
