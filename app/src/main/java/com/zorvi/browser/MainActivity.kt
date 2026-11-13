@@ -204,6 +204,14 @@ class MainActivity : Activity() {
         } else showAuthForm()
     }
 
+    private fun vaultLocalStorageKey(): String {
+        val account = novaAuth.currentEmail()?.trim()?.lowercase().orEmpty()
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(account.toByteArray(Charsets.UTF_8))
+        val suffix = digest.joinToString("") { "%02x".format(it) }
+        return "nova_vault_local_$suffix"
+    }
+
     private fun showPasswordVault() {
         if (guestMode || current()?.guest == true) {
             Toast.makeText(this, "The password vault is unavailable in Guest Mode.", Toast.LENGTH_SHORT).show()
@@ -247,7 +255,7 @@ class MainActivity : Activity() {
                         } else {
                             try {
                                 val localEnvelope = NovaVaultCrypto.encrypt(json, localPassphrase)
-                                prefs.edit().putString("nova_vault_local", localEnvelope.toString()).apply()
+                                prefs.edit().putString(vaultLocalStorageKey(), localEnvelope.toString()).apply()
                                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                                 showVaultEntries(json, localPassphrase.copyOf())
                             } catch (error: Exception) {
@@ -258,7 +266,7 @@ class MainActivity : Activity() {
                         }
                     }
                 } else {
-                    val local = prefs.getString("nova_vault_local", null)
+                    val local = prefs.getString(vaultLocalStorageKey(), null)
                     if (local.isNullOrBlank()) {
                         showVaultEntries("{\"entries\":[]}", passphrase)
                     } else {
