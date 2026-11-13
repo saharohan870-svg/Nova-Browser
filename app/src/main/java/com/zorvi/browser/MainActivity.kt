@@ -266,9 +266,22 @@ class MainActivity : Activity() {
         scroll.addView(panel)
         dialogTabs = AlertDialog.Builder(this).setTitle(group ?: "All tabs").setView(scroll)
             .setPositiveButton("New tab") { _, _ -> newTab("https://www.google.com", group) }
-            .setNeutralButton("Manage groups") { _, _ -> showTabs() }.setNegativeButton("Done", null).show()
+            .setNeutralButton(if (group == null) "Manage groups" else "Close group") { _, _ -> if (group == null) showTabs() else closeGroup(group) }.setNegativeButton("Done", null).show()
     }
 
+    private fun closeGroup(group: String) {
+        val positions = tabs.indices.filter { tabs[it].group == group }.reversed()
+        positions.forEach { position ->
+            if (tabs.size > 1) {
+                val removed = tabs.removeAt(position)
+                removed.session.close(); removed.view.releaseSession()
+                if (position < active) active-- else if (position == active) active = active.coerceAtMost(tabs.lastIndex)
+            } else {
+                tabs[0].session.loadUri("about:blank"); tabs[0].url = "about:blank"; tabs[0].title = "New tab"
+            }
+        }
+        saveTabState(); showOnlyActive(); updateTabs()
+    }
     private fun createTabGroup() {
         val input = EditText(this).apply { hint = "Group name"; setSingleLine(true) }
         AlertDialog.Builder(this).setTitle("Create tab group").setView(input)
