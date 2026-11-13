@@ -24,6 +24,7 @@ import android.view.inputmethod.EditorInfo
 import android.widget.*
 import org.json.JSONArray
 import org.mozilla.geckoview.GeckoRuntime
+import org.mozilla.geckoview.GeckoRuntimeSettings
 import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.GeckoSessionSettings
@@ -78,7 +79,8 @@ class MainActivity : Activity() {
     private val prefs by lazy { getSharedPreferences("zorvi", Context.MODE_PRIVATE) }
     private val novaAuth by lazy { NovaSupabaseAuth(applicationContext) }
     private val engines = listOf("Google", "Bing", "DuckDuckGo", "Brave Search")
-    private val runtime: GeckoRuntime by lazy { getOrCreateRuntime() }
+    private val torController by lazy { NovaTorController(applicationContext) }
+    private val runtime: GeckoRuntime get() = getOrCreateRuntime(applicationContext)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -873,6 +875,7 @@ class MainActivity : Activity() {
         session.setNavigationDelegate(object : GeckoSession.NavigationDelegate {
             override fun onLoadRequest(session: GeckoSession, request: GeckoSession.NavigationDelegate.LoadRequest): GeckoResult<AllowOrDeny>? {
                 if (isExternalScheme(request.uri)) {
+                    if (tab.guest) return GeckoResult.deny()
                     // Only a direct user gesture may launch another Android app.
                     if (request.hasUserGesture) openExternalUri(request.uri)
                     return GeckoResult.deny()
@@ -920,7 +923,7 @@ class MainActivity : Activity() {
         })
         session.setPermissionDelegate(object : GeckoSession.PermissionDelegate {
             override fun onAndroidPermissionsRequest(session: GeckoSession, permissions: Array<String>?, callback: GeckoSession.PermissionDelegate.Callback) {
-                if (permissions.isNullOrEmpty()) { callback.reject(); return }
+                if (tab.guest || permissions.isNullOrEmpty()) { callback.reject(); return }
                 pendingAndroidPermission = callback
                 requestPermissions(permissions, requestWebPermission)
             }
@@ -959,6 +962,7 @@ class MainActivity : Activity() {
                 return result
             }
             override fun onMediaPermissionRequest(session: GeckoSession, uri: String, video: Array<GeckoSession.PermissionDelegate.MediaSource>?, audio: Array<GeckoSession.PermissionDelegate.MediaSource>?, callback: GeckoSession.PermissionDelegate.MediaCallback) {
+                if (tab.guest) { callback.reject(); return }
                 runOnUiThread {
                     AlertDialog.Builder(this@MainActivity).setTitle("Camera / microphone")
                         .setMessage("Allow this website to use the requested camera or microphone?")
@@ -1007,6 +1011,10 @@ class MainActivity : Activity() {
         val hasScheme = scheme != null && scheme.matches(Regex("^[a-z][a-z0-9+.-]*$"))
         val target = when {
             hasScheme && (scheme == "http" || scheme == "https") -> value
+            hasScheme && current()?.guest == true -> {
+                Toast.makeText(this, "External app links are disabled in Guest Mode.", Toast.LENGTH_SHORT).show()
+                return
+            }
             hasScheme -> {
                 try { startActivity(Intent(Intent.ACTION_VIEW, uri)) } catch (_: Exception) {
                     Toast.makeText(this, "Unsupported link type", Toast.LENGTH_SHORT).show()
@@ -1203,7 +1211,7 @@ class MainActivity : Activity() {
     }
 
     private fun saveTabs() {
-        if (!::root.isInitialized) return
+        if (!::root.isInitialized || guestMode) return
         val saved = JSONArray()
         var savedActive = 0
         tabs.forEachIndexed { index, tab ->
@@ -1634,46 +1642,73 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun closeTabsForRuntimeRestart() {
+        saveTabs()
+        tabs.toList().forEach { tab ->
+            tab.session.setActive(false)
+            tab.view.releaseSession()
+            if (tab.session.isOpen) tab.session.close()
+        }
+        tabs.clear()
+        active = 0
+        if (root.childCount > 2) root.removeViews(2, root.childCount - 2)
+    }
+
     private fun showGuestTorStatus() {
-        AlertDialog.Builder(this).setTitle("Tor in Guest Mode")
-            .setMessage("Tor is not installed in Nova yet. Guest Mode currently uses GeckoView private sessions only; it does not hide your IP address or route traffic through Tor. Guest browsing will not be described as Tor-protected until a Tor runtime and leak-tested routing are integrated.")
-            .setPositiveButton("OK", null).show()
+        AlertDialog.Builder(this).setTitle("Tor connection active")
+            .setMessage("Guest browsing is routed through Nova's local Tor SOCKS proxy with remote DNS. WebRTC and HTTP/3 are disabled in this mode to reduce common proxy-bypass paths. This is Tor-routed GeckoView, not the Tor Browser: its fingerprinting protections and anonymity set are not equivalent. Avoid signing in to personal accounts.")
+            .setPositiveButton("Check Tor connection") { _, _ ->
+                current()?.session?.loadUri("https://check.torproject.org/")
+            }
+            .setNegativeButton("Close", null).show()
     }
 
     private fun startGuestMode() {
         if (guestMode) return
         guestReturnTab = current()
         privateMode = false
+        closeTabsForRuntimeRestart()
         guestMode = true
-        newTab("about:blank")
-        Toast.makeText(this, "Guest Mode started. Private session only; Tor routing is not configured.", Toast.LENGTH_LONG).show()
-        showGuestTorStatus()
+        resetRuntime(false, 0)
         refreshGuestModeButton()
+        Toast.makeText(this, "Starting Tor… this can take up to two minutes.", Toast.LENGTH_LONG).show()
+        torController.start { ready, socksPort, error ->
+            if (isFinishing || isDestroyed) return@start
+            if (!ready) {
+                guestMode = false
+                torController.stop()
+                resetRuntime(false, 0)
+                applyCookiePolicy()
+                restoreTabs()
+                if (tabs.isEmpty()) newTab(homePage())
+                refreshGuestModeButton()
+                AlertDialog.Builder(this).setTitle("Tor could not start")
+                    .setMessage(error ?: "Nova could not establish a Tor circuit. Guest Mode was not opened, and normal browsing has been restored.")
+                    .setPositiveButton("OK", null).show()
+                return@start
+            }
+            resetRuntime(true, socksPort)
+            applyCookiePolicy()
+            newTab("about:blank")
+            Toast.makeText(this, "Tor connected. Guest Mode is active.", Toast.LENGTH_LONG).show()
+            showGuestTorStatus()
+            refreshGuestModeButton()
+        }
     }
 
     private fun endGuestMode() {
         if (!guestMode) return
-        val guestTabs = tabs.filter { it.guest }
-        guestTabs.forEach { tab ->
-            val index = tabs.indexOf(tab)
-            if (index >= 0) tabs.removeAt(index)
-            tab.session.setActive(false)
-            tab.view.releaseSession()
-            if (tab.session.isOpen) tab.session.close()
-        }
+        closeTabsForRuntimeRestart()
         guestMode = false
         privateMode = false
-        val returnTab = guestReturnTab
-        guestReturnTab = null
-        active = returnTab?.let { tabs.indexOf(it) }?.takeIf { it >= 0 } ?: 0
+        resetRuntime(false, 0)
+        torController.stop()
+        applyCookiePolicy()
+        restoreTabs()
         if (tabs.isEmpty()) newTab(homePage())
-        else {
-            showOnlyActive()
-            updateTabs()
-            saveTabs()
-        }
+        guestReturnTab = null
         refreshGuestModeButton()
-        Toast.makeText(this, "Guest session ended. Guest tabs have been closed.", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "Guest session ended. Tor stopped and regular tabs restored.", Toast.LENGTH_LONG).show()
     }
 
     private fun refreshGuestModeButton() {
@@ -1763,25 +1798,63 @@ class MainActivity : Activity() {
             if (tab.session.isOpen) tab.session.close()
         }
         tabs.clear()
+        if (guestMode) resetRuntime(false, 0)
+        torController.stop()
         super.onDestroy()
     }
 
     companion object {
         @Volatile private var sharedRuntime: GeckoRuntime? = null
+        @Volatile private var torProxyEnabled: Boolean = false
+        @Volatile private var torSocksPort: Int = 0
+
+        private fun resetRuntime(useTor: Boolean, socksPort: Int) {
+            synchronized(this) {
+                sharedRuntime?.shutdown()
+                sharedRuntime = null
+                torProxyEnabled = useTor
+                torSocksPort = if (useTor) socksPort else 0
+            }
+        }
+
         private fun getOrCreateRuntime(context: Context): GeckoRuntime =
             sharedRuntime ?: synchronized(this) {
-                sharedRuntime ?: GeckoRuntime.create(context.applicationContext).also { created ->
-                    sharedRuntime = created
-                    created.webExtensionController.ensureBuiltIn(
-                        "resource://android/assets/nova_adblock/",
-                        "nova-adblock@zorvi.browser"
-                    ).accept(
-                        { android.util.Log.i("NovaAdBlock", "Network request filter installed") },
-                        { error -> android.util.Log.e("NovaAdBlock", "Could not install request filter", error) }
-                    )
+                sharedRuntime ?: run {
+                    val settings = GeckoRuntimeSettings.Builder()
+                    if (torProxyEnabled) {
+                        val config = File(context.filesDir, "nova-gecko-tor.yaml")
+                        val configText = listOf(
+                            "prefs:",
+                            "  network.proxy.type: 1",
+                            "  network.proxy.socks: 127.0.0.1",
+                            "  network.proxy.socks_port: $torSocksPort",
+                            "  network.proxy.socks_version: 5",
+                            "  network.proxy.socks_remote_dns: true",
+                            "  network.proxy.no_proxies_on: ''",
+                            "  network.proxy.failover_direct: false",
+                            "  network.dns.disablePrefetch: true",
+                            "  network.prefetch-next: false",
+                            "  network.http.speculative-parallel-limit: 0",
+                            "  network.http.http3.enable: false",
+                            "  media.peerconnection.enabled: false"
+                        ).joinToString("\n")
+                        config.writeText(configText)
+                        settings.configFilePath(config.absolutePath)
+                    } else {
+                        // Do not read external debug config in normal or release browsing.
+                        settings.configFilePath("")
+                    }
+                    GeckoRuntime.create(context.applicationContext, settings.build()).also { created ->
+                        sharedRuntime = created
+                        created.webExtensionController.ensureBuiltIn(
+                            "resource://android/assets/nova_adblock/",
+                            "nova-adblock@zorvi.browser"
+                        ).accept(
+                            { android.util.Log.i("NovaAdBlock", "Network request filter installed") },
+                            { error -> android.util.Log.e("NovaAdBlock", "Could not install request filter", error) }
+                        )
+                    }
                 }
             }
     }
-
-    private fun getOrCreateRuntime(): GeckoRuntime = getOrCreateRuntime(applicationContext)
 }
