@@ -485,7 +485,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(24, 8, 24, 8)
             addView(TextView(this@MainActivity).apply {
-                text = "Connect GitHub using its device authorization flow. First create a GitHub OAuth App and enable Device Flow. Zorvi needs read:user, repo and codespace permissions to display your Codespaces. No Codespace is created or started."
+                text = "Connect GitHub using its device authorization flow. First create a GitHub OAuth App and enable Device Flow. Zorvi requests only read:user and codespace scopes to verify your profile and list your Codespaces. It does not request repository access. No Codespace is created or started."
             })
             addView(clientId)
         }
@@ -522,12 +522,11 @@ class MainActivity : Activity() {
             .setPositiveButton("Continue") { _, _ ->
                 Thread {
                     val deadline = System.currentTimeMillis() + code.expiresInSeconds * 1000L
-                    var interval = code.intervalSeconds.coerceAtLeast(5)
                     var token: String? = null
                     var failure: String? = null
                     while (System.currentTimeMillis() < deadline && token == null && failure == null) {
                         try {
-                            Thread.sleep(interval * 1000L)
+                            Thread.sleep(githubAccount.nextPollIntervalSeconds() * 1000L)
                             token = githubAccount.pollForToken(clientId, code.deviceCode)
                         } catch (e: InterruptedException) {
                             Thread.currentThread().interrupt()
