@@ -349,7 +349,7 @@ class MainActivity : Activity() {
             is com.google.firebase.auth.FirebaseAuthWeakPasswordException -> "Choose a stronger password."
             is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException -> "The email or password is invalid."
             is com.google.firebase.auth.FirebaseAuthUserCollisionException -> "An account already exists for this email. Try signing in."
-            is com.google.firebase.auth.FirebaseNetworkException -> "Network error. Check your connection and try again."
+            is com.google.firebase.FirebaseNetworkException -> "Network error. Check your connection and try again."
             else -> error?.localizedMessage?.take(240) ?: "Please try again."
         }
         AlertDialog.Builder(this).setTitle(title).setMessage(message).setPositiveButton("OK", null).show()
