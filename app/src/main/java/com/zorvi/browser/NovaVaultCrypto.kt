@@ -1,6 +1,6 @@
 package com.zorvi.browser
 
-import android.util.Base64
+import java.util.Base64
 import org.json.JSONObject
 import java.nio.charset.StandardCharsets
 import java.security.SecureRandom
@@ -88,8 +88,8 @@ internal object NovaVaultCrypto {
     }
 
     private fun encode(bytes: ByteArray): String =
-        Base64.encodeToString(bytes, Base64.NO_WRAP)
+        Base64.getEncoder().encodeToString(bytes)
 
     private fun decode(value: String): ByteArray =
-        Base64.decode(value, Base64.NO_WRAP)
+        Base64.getDecoder().decode(value)
 }
