@@ -29,7 +29,7 @@ An Android browser prototype with a Chrome-inspired interface, powered exclusive
 
 ## Tor-backed Guest Mode
 
-Nova embeds Guardian Project's Tor Android service for Guest Mode. Nova waits for Tor bootstrap to complete before opening guest tabs, then creates a GeckoView runtime configured for the local SOCKS5 listener, remote DNS, and no direct proxy fallback. WebRTC, HTTP/3, DNS prefetch, and speculative connections are disabled in that runtime to reduce common bypass paths.
+Nova embeds Guardian Project's Tor Android service for Guest Mode. Nova waits for Tor bootstrap to complete before opening guest tabs, then creates a GeckoView runtime configured for the local SOCKS5 listener, remote DNS, and no direct proxy fallback. WebRTC, HTTP/3, DNS prefetch, and speculative connections are disabled in that runtime to reduce common bypass paths; Gecko's baseline `privacy.resistFingerprinting` preference is also enabled.
 
 Entering Guest Mode saves and suspends regular tabs, then switches the browser runtime to Tor. Guest tabs use GeckoView private sessions. Guest Mode does not save browsing history or tab state, and it hides regular bookmarks, history, and downloads. Website permissions, Android permissions, camera/microphone access, native account actions, and on-device translation model downloads are denied or disabled while guest browsing. External app links are blocked. Ending Guest Mode closes guest tabs, stops the Tor service, and restores the regular browser runtime and saved tabs.
 
