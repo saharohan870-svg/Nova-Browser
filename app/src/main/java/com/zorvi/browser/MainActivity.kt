@@ -429,10 +429,17 @@ class MainActivity : Activity() {
             "zorvi-filter-engine@zorvi.browser"
         ).accept(
             { extension ->
-                controller.setAllowedInPrivateBrowsing(extension, true)
-                adBlockReady = true
-                runOnUiThread {
-                    Toast.makeText(this, "Ad and tracker filter engine enabled", Toast.LENGTH_SHORT).show()
+                if (extension != null) {
+                    controller.setAllowedInPrivateBrowsing(extension, true)
+                    adBlockReady = true
+                    runOnUiThread {
+                        Toast.makeText(this, "Ad and tracker filter engine enabled", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    adBlockReady = false
+                    runOnUiThread {
+                        Toast.makeText(this, "Ad blocker unavailable; Gecko tracking protection remains on", Toast.LENGTH_LONG).show()
+                    }
                 }
             },
             { error ->
