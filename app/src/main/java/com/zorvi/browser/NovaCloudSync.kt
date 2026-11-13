@@ -78,25 +78,6 @@ internal class NovaCloudSync(
         }
     }
 
-    private fun readLocalSnapshot(): JSONObject {
-        val result = JSONObject()
-        for (key in syncedKeys) {
-            val value = preferences.all[key] ?: continue
-            when (value) {
-                is String, is Boolean, is Int, is Long -> result.put(key, value)
-                is Float -> result.put(key, value.toDouble())
-            }
-        }
-        for ((key, value) in preferences.all) {
-            if (!key.startsWith("site_permission_")) continue
-            when (value) {
-                is String, is Boolean, is Int, is Long -> result.put(key, value)
-            }
-        }
-        // Android DownloadManager IDs, auth tokens, and private/guest data are never uploaded.
-        return result
-    }
-
     private fun clearLocalBrowserSnapshot() {
         val editor = preferences.edit()
         (syncedKeys + preferences.all.keys.filter { it.startsWith("site_permission_") }).forEach { editor.remove(it) }
