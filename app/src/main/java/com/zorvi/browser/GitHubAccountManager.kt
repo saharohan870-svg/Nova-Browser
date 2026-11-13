@@ -33,7 +33,7 @@ class GitHubAccountManager(context: Context) {
 
     fun requestDeviceCode(clientId: String): DeviceCode {
         require(clientId.isNotBlank()) { "GitHub OAuth client ID is required" }
-        val body = "client_id=" + enc(clientId) + "&scope=" + enc("read:user repo codespace")
+        val body = "client_id=" + enc(clientId) + "&scope=" + enc("read:user codespace")
         val json = postForm("https://github.com/login/device/code", body)
         return DeviceCode(
             deviceCode = json.getString("device_code"),
