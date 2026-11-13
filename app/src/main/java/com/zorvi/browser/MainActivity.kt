@@ -297,8 +297,9 @@ class MainActivity : Activity() {
                     .setNeutralButton("Delete") { _, _ ->
                         val updated = JSONArray()
                         for (i in 0 until entries.length()) if (i != index) updated.put(entries.opt(i))
+                        val nextPassphrase = passphrase.copyOf()
                         saveVaultAndSync(updated, passphrase)
-                        showVaultEntries(org.json.JSONObject().put("entries", updated).toString(), passphrase.copyOf())
+                        showVaultEntries(org.json.JSONObject().put("entries", updated).toString(), nextPassphrase)
                     }
                     .setNegativeButton("Close", null).show()
             }
@@ -335,8 +336,9 @@ class MainActivity : Activity() {
                         .put("site", site.text.toString().trim())
                         .put("username", username.text.toString().trim())
                         .put("password", password.text.toString()))
+                    val nextPassphrase = passphrase.copyOf()
                     saveVaultAndSync(updated, passphrase)
-                    showVaultEntries(org.json.JSONObject().put("entries", updated).toString(), passphrase.copyOf())
+                    showVaultEntries(org.json.JSONObject().put("entries", updated).toString(), nextPassphrase)
                 }
             }
             .setNegativeButton("Cancel") { _, _ -> passphrase.fill('\u0000') }
@@ -345,15 +347,19 @@ class MainActivity : Activity() {
 
     private fun saveVaultAndSync(entries: JSONArray, passphrase: CharArray) {
         val json = org.json.JSONObject().put("entries", entries).toString()
+        val localPassphrase = passphrase.copyOf()
+        val cloudPassphrase = passphrase.copyOf()
         try {
-            val localEnvelope = NovaVaultCrypto.encrypt(json, passphrase)
+            val localEnvelope = NovaVaultCrypto.encrypt(json, localPassphrase)
             prefs.edit().putString("nova_vault_local", localEnvelope.toString()).apply()
-            encryptedVaultSync.backup(json, passphrase.copyOf()) { ok, message ->
+            encryptedVaultSync.backup(json, cloudPassphrase) { _, message ->
                 Toast.makeText(this, message, Toast.LENGTH_LONG).show()
             }
         } catch (error: Exception) {
+            cloudPassphrase.fill('\u0000')
             Toast.makeText(this, error.message ?: "Could not encrypt the password vault.", Toast.LENGTH_LONG).show()
         } finally {
+            localPassphrase.fill('\u0000')
             passphrase.fill('\u0000')
         }
     }
