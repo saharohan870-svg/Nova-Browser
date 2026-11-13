@@ -19,7 +19,7 @@ import java.util.Locale
 
 /** Main browser surface. Web pages are rendered by GeckoView, never Android WebView. */
 class MainActivity : Activity() {
-    private data class BrowserTab(val session: GeckoSession, val view: GeckoView, val isPrivate: Boolean, var title: String = "New tab", var group: String = "Default", var canGoBack: Boolean = false)
+    private data class BrowserTab(val session: GeckoSession, val view: GeckoView, val isPrivate: Boolean, var title: String = "New tab", var group: String = "Default", var canGoBack: Boolean = false, var url: String = "about:blank")
 
     private lateinit var root: LinearLayout
     private lateinit var address: EditText
@@ -36,7 +36,15 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         runtime = GeckoRuntime.create(this)
         buildUi()
-        newTab("https://www.google.com")
+        val restored = BrowserTabState.decode(prefs.getString("saved_tabs", null))
+        if (restored.first.isEmpty()) {
+            newTab("https://www.google.com")
+        } else {
+            restored.first.forEach { saved -> newTab(saved.url, saved.group) }
+            active = restored.second.coerceIn(0, tabs.lastIndex)
+            showOnlyActive()
+            updateTabs()
+        }
     }
 
     private fun buildUi() {
@@ -112,7 +120,7 @@ class MainActivity : Activity() {
     private fun activeTab() = tabs.getOrNull(active)
     private fun activeSession() = activeTab()?.session
 
-    private fun newTab(url: String = "about:blank") {
+    private fun newTab(url: String = "about:blank", groupName: String? = null) {
         val settings = GeckoSessionSettings.Builder()
             .usePrivateMode(privateMode)
             .useTrackingProtection(true)
@@ -132,6 +140,8 @@ class MainActivity : Activity() {
             ) {
                 if (session === activeSession()) address.setText(url.orEmpty())
                 val tab = tabs.firstOrNull { it.session === session }
+                tab?.url = url ?: "about:blank"
+                saveTabState()
                 if (tab?.isPrivate == false && !url.isNullOrBlank() &&
                     (url.startsWith("https://") || url.startsWith("http://"))) {
                     saveHistory(url)
@@ -148,12 +158,13 @@ class MainActivity : Activity() {
                 if (session === activeSession()) updateTabs()
             }
         }
-        tabs.add(BrowserTab(session, view, privateMode, group = activeTab()?.group ?: "Default"))
+        tabs.add(BrowserTab(session, view, privateMode, group = groupName ?: activeTab()?.group ?: "Default", url = url))
         active = tabs.lastIndex
         root.addView(view, LinearLayout.LayoutParams(-1, 0, 1f))
         showOnlyActive()
         updateTabs()
         if (url != "about:blank") session.loadUri(url)
+        saveTabState()
     }
 
     private fun showOnlyActive() {
@@ -192,6 +203,14 @@ class MainActivity : Activity() {
 
     private fun updateTabs() { tabsLabel.text = "Tabs " + tabs.size }
 
+    /** Persist normal tabs only; private URLs are deliberately excluded. */
+    private fun saveTabState() {
+        val normalTabs = tabs.filterNot { it.isPrivate }
+        val activeNormalIndex = normalTabs.indexOfFirst { it === activeTab() }.coerceAtLeast(0)
+        val saved = normalTabs.map { SavedBrowserTab(it.url, it.group) }
+        prefs.edit().putString("saved_tabs", BrowserTabState.encode(saved, activeNormalIndex)).apply()
+    }
+
     private fun showTabs() {
         val labels = tabs.mapIndexed { index, tab ->
             (index + 1).toString() + ". " + (if (tab.isPrivate) "[Private] " else "") +
@@ -201,7 +220,7 @@ class MainActivity : Activity() {
         AlertDialog.Builder(this).setTitle("Zorvi tabs")
             .setItems(labels.toTypedArray()) { _, which ->
                 if (which == tabs.size) newTab("https://www.google.com")
-                else { active = which; showOnlyActive(); updateTabs() }
+                else { active = which; showOnlyActive(); updateTabs(); saveTabState() }
             }
             .setNegativeButton("Close current") { _, _ -> closeTab() }
             .show()
@@ -226,6 +245,7 @@ class MainActivity : Activity() {
                             val name = nameInput.text.toString().trim().take(24)
                             if (name.isNotEmpty()) {
                                 tab.group = name
+                                saveTabState()
                                 updateTabs()
                             }
                         }
@@ -233,6 +253,7 @@ class MainActivity : Activity() {
                         .show()
                 } else {
                     tab.group = existing[which]
+                    saveTabState()
                     updateTabs()
                 }
             }
@@ -251,6 +272,7 @@ class MainActivity : Activity() {
         removed.session.close()
         removed.view.releaseSession()
         active = active.coerceAtMost(tabs.lastIndex)
+        saveTabState()
         showOnlyActive()
         updateTabs()
     }
@@ -336,6 +358,7 @@ class MainActivity : Activity() {
             tab.session.close()
             tab.view.releaseSession()
         }
+        saveTabState()
         tabs.clear()
         super.onDestroy()
     }
