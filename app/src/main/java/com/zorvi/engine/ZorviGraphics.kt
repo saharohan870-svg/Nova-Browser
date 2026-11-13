@@ -7,7 +7,9 @@ import android.graphics.RectF
 import android.graphics.Typeface
 
 /** Platform-neutral rectangle in CSS pixel coordinates. */
-internal data class ZorviRect(val left: Float, val top: Float, val right: Float, val bottom: Float)
+internal data class ZorviRect(val left: Float, val top: Float, val right: Float, val bottom: Float) {
+    init { require(left.isFinite() && top.isFinite() && right.isFinite() && bottom.isFinite()) }
+}
 
 /** Immutable display-list commands. Coordinates are device-independent CSS pixels. */
 internal sealed interface ZorviPaintCommand {
@@ -21,16 +23,25 @@ internal sealed interface ZorviPaintCommand {
         val typeface: Typeface = Typeface.DEFAULT
     ) : ZorviPaintCommand
     data class DrawBitmap(val bitmap: Bitmap, val destination: ZorviRect, val alpha: Int = 255) : ZorviPaintCommand
+    data class ClipRect(val bounds: ZorviRect) : ZorviPaintCommand
+    data class Translate(val dx: Float, val dy: Float) : ZorviPaintCommand
+    data class Scale(val sx: Float, val sy: Float, val pivotX: Float = 0f, val pivotY: Float = 0f) : ZorviPaintCommand
+    data class Rotate(val degrees: Float, val pivotX: Float = 0f, val pivotY: Float = 0f) : ZorviPaintCommand
+    data object Save : ZorviPaintCommand
+    data object Restore : ZorviPaintCommand
+    data class SaveLayerAlpha(val bounds: ZorviRect, val alpha: Int) : ZorviPaintCommand
 }
 
 /**
  * Small Android raster backend for the engine display list.
  * It owns no DOM/layout state; callers provide an ordered immutable command snapshot.
+ * Save/restore is balanced defensively so a malformed display list cannot underflow Canvas state.
  */
 internal class ZorviGraphicsRenderer {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG)
 
     fun render(canvas: Canvas, commands: List<ZorviPaintCommand>) {
+        val initialSaveCount = canvas.saveCount
         commands.forEach { command ->
             when (command) {
                 is ZorviPaintCommand.FillRect -> {
@@ -38,7 +49,7 @@ internal class ZorviGraphicsRenderer {
                     paint.isAntiAlias = true
                     paint.color = command.color
                     paint.style = Paint.Style.FILL
-                    canvas.drawRect(RectF(command.bounds.left, command.bounds.top, command.bounds.right, command.bounds.bottom), paint)
+                    canvas.drawRect(command.bounds.toRectF(), paint)
                 }
                 is ZorviPaintCommand.DrawText -> {
                     paint.reset()
@@ -53,11 +64,27 @@ internal class ZorviGraphicsRenderer {
                     paint.isAntiAlias = true
                     paint.isFilterBitmap = true
                     paint.alpha = command.alpha.coerceIn(0, 255)
-                    canvas.drawBitmap(command.bitmap, null, RectF(command.destination.left, command.destination.top, command.destination.right, command.destination.bottom), paint)
+                    canvas.drawBitmap(command.bitmap, null, command.destination.toRectF(), paint)
                 }
+                is ZorviPaintCommand.ClipRect -> canvas.clipRect(command.bounds.toRectF())
+                is ZorviPaintCommand.Translate -> if (command.dx.isFinite() && command.dy.isFinite()) canvas.translate(command.dx, command.dy)
+                is ZorviPaintCommand.Scale -> if (command.sx.isFinite() && command.sy.isFinite() && command.pivotX.isFinite() && command.pivotY.isFinite()) {
+                    canvas.scale(command.sx.coerceIn(-100f, 100f), command.sy.coerceIn(-100f, 100f), command.pivotX, command.pivotY)
+                }
+                is ZorviPaintCommand.Rotate -> if (command.degrees.isFinite() && command.pivotX.isFinite() && command.pivotY.isFinite()) {
+                    canvas.rotate(command.degrees % 360f, command.pivotX, command.pivotY)
+                }
+                ZorviPaintCommand.Save -> canvas.save()
+                ZorviPaintCommand.Restore -> if (canvas.saveCount > initialSaveCount) canvas.restore()
+                is ZorviPaintCommand.SaveLayerAlpha -> canvas.saveLayerAlpha(
+                    command.bounds.toRectF(), command.alpha.coerceIn(0, 255)
+                )
             }
         }
+        while (canvas.saveCount > initialSaveCount) canvas.restore()
     }
+
+    private fun ZorviRect.toRectF() = RectF(left, top, right, bottom)
 }
 
 /** Deterministic Android font-family fallback for CSS generic-family requests. */
@@ -122,7 +149,7 @@ internal object ZorviImageDecoder {
     internal fun calculateSampleSize(width: Int, height: Int, targetWidth: Int, targetHeight: Int): Int {
         require(width > 0 && height > 0 && targetWidth > 0 && targetHeight > 0)
         var sample = 1
-        while (width / (sample * 2) >= targetWidth && height / (sample * 2) >= targetHeight) {
+        while (sample <= (1 shl 29) && width / (sample * 2) >= targetWidth && height / (sample * 2) >= targetHeight) {
             sample *= 2
         }
         return sample
