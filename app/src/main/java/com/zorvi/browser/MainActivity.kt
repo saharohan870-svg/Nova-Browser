@@ -359,7 +359,7 @@ class MainActivity : Activity() {
         val cloudPassphrase = passphrase.copyOf()
         try {
             val localEnvelope = NovaVaultCrypto.encrypt(json, localPassphrase)
-            prefs.edit().putString("nova_vault_local", localEnvelope.toString()).apply()
+            prefs.edit().putString(vaultLocalStorageKey(), localEnvelope.toString()).apply()
             encryptedVaultSync.backup(json, cloudPassphrase) { _, message ->
                 Toast.makeText(this, message, Toast.LENGTH_LONG).show()
             }
