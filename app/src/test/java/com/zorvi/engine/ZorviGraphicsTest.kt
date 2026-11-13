@@ -38,7 +38,9 @@ class ZorviGraphicsTest {
     }
 
     @Test fun fontResolverAcceptsGenericFamiliesAndStyles() {
-        assertEquals(android.graphics.Typeface.BOLD_ITALIC, ZorviFontResolver.resolve("serif", 700, true).style)
-        assertEquals(android.graphics.Typeface.NORMAL, ZorviFontResolver.resolve("monospace").style)
+        assertEquals(android.graphics.Typeface.BOLD_ITALIC, ZorviFontResolver.styleFor(700, true))
+        assertEquals(android.graphics.Typeface.NORMAL, ZorviFontResolver.styleFor(400, false))
+        assertEquals(android.graphics.Typeface.ITALIC, ZorviFontResolver.styleFor(400, true))
+        assertEquals(android.graphics.Typeface.BOLD, ZorviFontResolver.styleFor(700, false))
     }
 }
