@@ -84,6 +84,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         dark = prefs.getBoolean("dark_mode", false)
         buildUi()
+        novaAuth.restoreSession { refreshAccountButton() }
         applyCookiePolicy()
         restoreTabs()
         if (tabs.isEmpty()) newTab(homePage())
@@ -294,7 +295,10 @@ class MainActivity : Activity() {
                 novaAuth.resetPassword(address) { ok, message ->
                     runOnUiThread {
                         dialog.dismiss()
-                        Toast.makeText(this, message ?: if (ok) "If the account exists, a reset email was sent." else "Could not send reset email.", Toast.LENGTH_LONG).show()
+                        if (ok) {
+                            Toast.makeText(this, message ?: "If the account exists, a reset code was sent.", Toast.LENGTH_LONG).show()
+                            showPasswordResetOtpVerification(address)
+                        } else showAuthError("Could not send reset code", message)
                     }
                 }
             }
@@ -338,6 +342,70 @@ class MainActivity : Activity() {
                     runOnUiThread {
                         dialog.getButton(AlertDialog.BUTTON_NEUTRAL).isEnabled = true
                         Toast.makeText(this, message ?: if (ok) "A new code was sent." else "Could not resend code.", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun showPasswordResetOtpVerification(emailAddress: String) {
+        val code = EditText(this).apply {
+            hint = "6-digit password-reset code"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            isSingleLine = true
+            filters = arrayOf(android.text.InputFilter.LengthFilter(6))
+        }
+        val dialog = AlertDialog.Builder(this).setTitle("Reset Nova password")
+            .setMessage("Enter the six-digit recovery code sent to $emailAddress.")
+            .setView(code).setPositiveButton("Verify code", null)
+            .setNegativeButton("Cancel", null).create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val entered = code.text.toString().trim()
+                if (!entered.matches(Regex("\\d{6}"))) {
+                    code.error = "Enter all 6 digits"
+                    return@setOnClickListener
+                }
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
+                novaAuth.verifyRecoveryOtp(emailAddress, entered) { ok, message ->
+                    runOnUiThread {
+                        if (ok) {
+                            dialog.dismiss()
+                            val newPassword = EditText(this).apply {
+                                hint = "New password (at least 8 characters)"
+                                inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                                isSingleLine = true
+                            }
+                            val passwordDialog = AlertDialog.Builder(this)
+                                .setTitle("Choose a new password")
+                                .setView(newPassword)
+                                .setPositiveButton("Update password", null)
+                                .setNegativeButton("Cancel", null).create()
+                            passwordDialog.setOnShowListener {
+                                passwordDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                                    val value = newPassword.text.toString()
+                                    if (value.length < 8) {
+                                        newPassword.error = "Use at least 8 characters"
+                                        return@setOnClickListener
+                                    }
+                                    passwordDialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
+                                    novaAuth.updatePassword(value) { updated, updateMessage ->
+                                        runOnUiThread {
+                                            passwordDialog.dismiss()
+                                            if (updated) {
+                                                refreshAccountButton()
+                                                Toast.makeText(this, updateMessage, Toast.LENGTH_LONG).show()
+                                            } else showAuthError("Password update failed", updateMessage)
+                                        }
+                                    }
+                                }
+                            }
+                            passwordDialog.show()
+                        } else {
+                            dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = true
+                            showAuthError("Recovery code verification failed", message)
+                        }
                     }
                 }
             }
