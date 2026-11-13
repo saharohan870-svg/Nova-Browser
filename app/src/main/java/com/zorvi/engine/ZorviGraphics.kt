@@ -99,13 +99,14 @@ internal object ZorviFontResolver {
             "sans-serif", "arial", "helvetica", "roboto", "" -> "sans-serif"
             else -> normalized
         }
-        val style = when {
-            weight >= 600 && italic -> Typeface.BOLD_ITALIC
-            weight >= 600 -> Typeface.BOLD
-            italic -> Typeface.ITALIC
-            else -> Typeface.NORMAL
-        }
-        return Typeface.create(base, style)
+        return Typeface.create(base, styleFor(weight, italic))
+    }
+
+    internal fun styleFor(weight: Int, italic: Boolean): Int = when {
+        weight >= 600 && italic -> Typeface.BOLD_ITALIC
+        weight >= 600 -> Typeface.BOLD
+        italic -> Typeface.ITALIC
+        else -> Typeface.NORMAL
     }
 }
 
