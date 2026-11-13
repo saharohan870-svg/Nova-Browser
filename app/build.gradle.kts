@@ -44,6 +44,8 @@ dependencies {
     implementation("com.google.mlkit:translate:17.0.3")
     implementation("com.google.mlkit:language-id:17.0.6")
     implementation("com.wireguard.android:tunnel:1.0.20260102")
+    // Native Tor daemon and Android TorService from Guardian Project.
+    implementation("info.guardianproject:tor-android:0.4.9.14")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     testImplementation("junit:junit:4.13.2")
 }
