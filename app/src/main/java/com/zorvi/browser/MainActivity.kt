@@ -31,6 +31,7 @@ class MainActivity : Activity() {
     private var dark = false
     private val prefs by lazy { getSharedPreferences("zorvi", Context.MODE_PRIVATE) }
     private val engines = listOf("Google", "Bing", "DuckDuckGo", "Brave Search")
+    private val downloadManager by lazy { BrowserDownloadManager(this) { runOnUiThread { } } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -92,6 +93,7 @@ class MainActivity : Activity() {
         controls.addView(button("★") { bookmark() })
         controls.addView(button("Bookmarks") { showSavedList(false) })
         controls.addView(button("History") { showSavedList(true) })
+        controls.addView(button("Downloads") { showDownloads() })
         tabsLabel = TextView(this).apply {
             text = "Tabs 0"
             gravity = Gravity.CENTER
@@ -152,6 +154,21 @@ class MainActivity : Activity() {
             }
         })
         session.contentDelegate = object : GeckoSession.ContentDelegate {
+            override fun onExternalResponse(session: GeckoSession, response: org.mozilla.geckoview.WebResponse) {
+                val suggested = response.headers.entries.firstOrNull { it.key.equals("Content-Disposition", true) }
+                    ?.value?.substringAfter("filename=", "")?.trim()?.trim('"')
+                    ?.takeIf { it.isNotBlank() } ?: response.uri.substringBefore('?').substringAfterLast('/').ifBlank { "download" }
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("Download file?").setMessage(suggested)
+                    .setPositiveButton("Download") { _, _ ->
+                        downloadManager.start(response)
+                        Toast.makeText(this@MainActivity, "Download started", Toast.LENGTH_SHORT).show()
+                    }
+                    .setNegativeButton("Cancel") { _, _ -> runCatching { response.body?.close() } }
+                    .setOnCancelListener { runCatching { response.body?.close() } }
+                    .show()
+            }
+
             override fun onTitleChange(session: GeckoSession, title: String?) {
                 val tab = tabs.firstOrNull { it.session === session } ?: return
                 tab.title = title?.takeIf { it.isNotBlank() } ?: "New tab"
@@ -303,6 +320,28 @@ class MainActivity : Activity() {
         root.setBackgroundColor(if (dark) Color.rgb(30, 30, 30) else Color.WHITE)
         address.setTextColor(if (dark) Color.WHITE else Color.BLACK)
         address.setHintTextColor(if (dark) Color.LTGRAY else Color.GRAY)
+    }
+
+    private fun showDownloads() {
+        val entries = downloadManager.entries()
+        if (entries.isEmpty()) { Toast.makeText(this, "No downloads yet", Toast.LENGTH_SHORT).show(); return }
+        val labels = entries.map { it.name + " — " + it.status }.toTypedArray()
+        AlertDialog.Builder(this).setTitle("Downloads")
+            .setItems(labels) { _, index ->
+                val item = entries[index]
+                if (item.status != "Complete" || item.uri.isBlank()) {
+                    Toast.makeText(this, item.status, Toast.LENGTH_SHORT).show()
+                } else if (item.uri.startsWith("content://")) {
+                    val mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(item.name.substringAfterLast(".", "").lowercase()) ?: "*/*"
+                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                        setDataAndType(android.net.Uri.parse(item.uri), mime)
+                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    runCatching { startActivity(intent) }.onFailure { Toast.makeText(this, "No app can open this file", Toast.LENGTH_SHORT).show() }
+                } else { Toast.makeText(this, "Saved in app Downloads: " + item.uri, Toast.LENGTH_LONG).show() }
+            }
+            .setNeutralButton("Clear completed") { _, _ -> downloadManager.clearCompleted() }
+            .setNegativeButton("Close", null).show()
     }
 
     private fun bookmark() {
