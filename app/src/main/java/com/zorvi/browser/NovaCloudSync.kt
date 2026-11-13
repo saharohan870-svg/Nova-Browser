@@ -7,7 +7,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.time.Instant
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -27,14 +26,11 @@ internal class NovaCloudSync(
     )
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key != null && (key in syncedKeys || key.startsWith("site_permission_"))) {
-            preferences.edit().putLong("_nova_cloud_dirty_at", System.currentTimeMillis()).apply()
+            preferences.edit().putBoolean("_nova_cloud_dirty", true).apply()
         }
     }
 
     init {
-        if (!preferences.getBoolean("cloud_sync_initialized", false)) {
-            preferences.edit().putLong("_nova_cloud_dirty_at", 0L).apply()
-        }
         preferences.registerOnSharedPreferenceChangeListener(preferenceListener)
     }
 
@@ -51,22 +47,28 @@ internal class NovaCloudSync(
             }
             executor.execute {
                 try {
+                    val account = auth.currentEmail()?.trim()?.lowercase().orEmpty()
+                    val previousAccount = preferences.getString("cloud_sync_account", null)
+                    if (previousAccount != null && previousAccount != account) clearLocalBrowserSnapshot()
+                    val initializedForAccount = preferences.getBoolean("cloud_sync_initialized", false) &&
+                        previousAccount == account
                     val local = readLocalSnapshot()
-                    val rows = request("/rest/v1/nova_sync_state?select=snapshot,updated_at&limit=1", token, null, "GET") as? JSONArray
-                    val remoteRow = if (rows != null && rows.length() > 0) rows.optJSONObject(0) else null
-                    val remote = remoteRow?.optJSONObject("snapshot")
-                    val remoteUpdatedAt = runCatching {
-                        Instant.parse(remoteRow?.optString("updated_at").orEmpty()).toEpochMilli()
-                    }.getOrDefault(0L)
-                    val localDirtyAt = preferences.getLong("_nova_cloud_dirty_at", 0L)
-                    val merged = if (remote == null) local else mergeSnapshots(remote, local, localDirtyAt > remoteUpdatedAt)
+                    val rows = request("/rest/v1/nova_sync_state?select=snapshot&limit=1", token, null, "GET") as? JSONArray
+                    val remote = if (rows != null && rows.length() > 0) rows.optJSONObject(0)?.optJSONObject("snapshot") else null
+                    val chosen = when {
+                        remote == null -> local
+                        !initializedForAccount -> remote
+                        preferences.getBoolean("_nova_cloud_dirty", false) -> local
+                        else -> remote
+                    }
                     request("/rest/v1/nova_sync_state?on_conflict=user_id", token,
-                        JSONObject().put("snapshot", merged), "POST")
-                    applySnapshot(merged)
+                        JSONObject().put("snapshot", chosen), "POST")
+                    applySnapshot(chosen)
                     preferences.edit().putBoolean("cloud_sync_initialized", true)
-                        .putLong("cloud_sync_last_success", System.currentTimeMillis())
-                        .putLong("_nova_cloud_dirty_at", 0L).apply()
-                    main.post { callback(true, "Nova is synced across your devices.") }
+                        .putString("cloud_sync_account", account)
+                        .putBoolean("_nova_cloud_dirty", false)
+                        .putLong("cloud_sync_last_success", System.currentTimeMillis()).apply()
+                    main.post { callback(true, if (remote == null) "Nova cloud backup created." else "Your Nova data is restored and synced.") }
                 } catch (error: Exception) {
                     main.post { callback(false, error.message ?: "Cloud sync failed.") }
                 } finally {
@@ -95,41 +97,44 @@ internal class NovaCloudSync(
         return result
     }
 
-    private fun mergeSnapshots(remote: JSONObject, local: JSONObject, preferLocalScalars: Boolean): JSONObject {
-        val merged = JSONObject(remote.toString())
-        val arrayKeys = setOf("bookmarks", "history", "recently_closed", "open_tabs")
-        for (key in local.keys()) {
-            val localValue = local.opt(key)
-            if (key in arrayKeys) {
-                val combined = JSONArray()
-                val seen = LinkedHashSet<String>()
-                fun append(array: JSONArray) {
-                    for (i in 0 until array.length()) {
-                        val item = array.opt(i)
-                        val identity = if (key == "open_tabs" && item is JSONObject) item.optString("url") else item.toString()
-                        if (identity.isNotBlank() && seen.add(identity)) combined.put(item)
-                    }
-                }
-                append(parseArray(merged.opt(key)))
-                append(parseArray(localValue))
-                val limit = when (key) { "history" -> 300; "recently_closed" -> 20; "open_tabs" -> 100; else -> 1000 }
-                val trimmed = JSONArray()
-                for (i in (combined.length() - limit).coerceAtLeast(0) until combined.length()) trimmed.put(combined.opt(i))
-                merged.put(key, trimmed)
-            } else if (preferLocalScalars || !merged.has(key)) merged.put(key, localValue)
-        }
-        return merged
+    private fun clearLocalBrowserSnapshot() {
+        val editor = preferences.edit()
+        (syncedKeys + preferences.all.keys.filter { it.startsWith("site_permission_") }).forEach { editor.remove(it) }
+        editor.putBoolean("cloud_sync_initialized", false)
+        editor.putBoolean("_nova_cloud_dirty", false)
+        editor.commit()
     }
 
-    private fun parseArray(value: Any?): JSONArray = when (value) {
-        is JSONArray -> value
-        is String -> runCatching { JSONArray(value) }.getOrDefault(JSONArray())
-        else -> JSONArray()
+    private fun readLocalSnapshot(): JSONObject {
+        val result = JSONObject()
+        for (key in syncedKeys) {
+            val value = preferences.all[key] ?: when (key) {
+                "bookmarks", "history", "open_tabs", "recently_closed", "direct_downloads" -> "[]"
+                "active_tab", "engine", "reader_text_size", "cookie_policy" -> 0
+                "dark_mode", "reader_dark", "tracking_protection", "desktop_mode" -> false
+                else -> continue
+            }
+            when (value) {
+                is String, is Boolean, is Int, is Long -> result.put(key, value)
+                is Float -> result.put(key, value.toDouble())
+            }
+        }
+        for ((key, value) in preferences.all) {
+            if (!key.startsWith("site_permission_")) continue
+            when (value) {
+                is String, is Boolean, is Int, is Long -> result.put(key, value)
+            }
+        }
+        // Device-specific DownloadManager IDs, authentication tokens and private/guest data are excluded.
+        return result
     }
 
     private fun applySnapshot(snapshot: JSONObject) {
         preferences.unregisterOnSharedPreferenceChangeListener(preferenceListener)
         val editor = preferences.edit()
+        val present = snapshot.keys().asSequence().toSet()
+        for (key in syncedKeys) if (key !in present) editor.remove(key)
+        preferences.all.keys.filter { it.startsWith("site_permission_") && it !in present }.forEach { editor.remove(it) }
         for (key in snapshot.keys()) {
             when (val value = snapshot.opt(key)) {
                 is String -> editor.putString(key, value)
@@ -140,6 +145,7 @@ internal class NovaCloudSync(
                 is JSONArray, is JSONObject -> editor.putString(key, value.toString())
             }
         }
+        editor.putBoolean("_nova_cloud_dirty", false)
         editor.commit()
         preferences.registerOnSharedPreferenceChangeListener(preferenceListener)
     }
