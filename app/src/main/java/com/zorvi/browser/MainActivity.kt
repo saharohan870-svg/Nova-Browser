@@ -929,6 +929,10 @@ class MainActivity : Activity() {
             }
             override fun onContentPermissionRequest(session: GeckoSession, perm: GeckoSession.PermissionDelegate.ContentPermission): GeckoResult<Int> {
                 val result = GeckoResult<Int>()
+                if (tab.guest) {
+                    result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY)
+                    return result
+                }
                 val host = runCatching { Uri.parse(perm.uri).host }.getOrNull() ?: "this website"
                 val permissionKey = "site_permission_" + host + "_" + perm.permission
                 val remembered = if (tab.guest) -1 else prefs.getInt(permissionKey, -1)
@@ -1656,7 +1660,7 @@ class MainActivity : Activity() {
 
     private fun showGuestTorStatus() {
         AlertDialog.Builder(this).setTitle("Tor connection active")
-            .setMessage("Guest browsing is routed through Nova's local Tor SOCKS proxy with remote DNS. WebRTC and HTTP/3 are disabled in this mode to reduce common proxy-bypass paths. This is Tor-routed GeckoView, not the Tor Browser: its fingerprinting protections and anonymity set are not equivalent. Avoid signing in to personal accounts.")
+            .setMessage("Nova has started its embedded Tor service and configured GeckoView to use its local SOCKS proxy with remote DNS. WebRTC and HTTP/3 are disabled to reduce common proxy-bypass paths. Use the connection check below to confirm the route. This is Tor-routed GeckoView, not the Tor Browser: its fingerprinting protections and anonymity set are not equivalent. Avoid signing in to personal accounts or sharing identifying information.")
             .setPositiveButton("Check Tor connection") { _, _ ->
                 current()?.session?.loadUri("https://check.torproject.org/")
             }
