@@ -205,18 +205,25 @@ class MainActivity : Activity() {
     private fun syncCloud(showMessage: Boolean) {
         if (guestMode || novaAuth.currentEmail() == null) return
         saveTabs()
+        val tabsBeforeSync = prefs.getString("open_tabs", "[]")
         cloudSync.sync { ok, message ->
             if (ok) {
-                tabs.toList().forEach { tab ->
-                    tab.view.releaseSession()
-                    if (tab.session.isOpen) tab.session.close()
+                val tabsAfterSync = prefs.getString("open_tabs", "[]")
+                if (tabsBeforeSync != tabsAfterSync) {
+                    tabs.toList().forEach { tab ->
+                        tab.view.releaseSession()
+                        if (tab.session.isOpen) tab.session.close()
+                    }
+                    tabs.clear()
+                    active = 0
+                    restoreTabs()
+                    if (tabs.isEmpty()) newTab(homePage())
                 }
-                tabs.clear()
-                active = 0
-                restoreTabs()
-                if (tabs.isEmpty()) newTab(homePage())
+                dark = prefs.getBoolean("dark_mode", dark)
+                if (::engine.isInitialized) engine.setSelection(prefs.getInt("engine", 0).coerceIn(0, engines.lastIndex))
+                applyTheme()
             }
-            if (showMessage || !ok) Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            if (showMessage) Toast.makeText(this, message, Toast.LENGTH_LONG).show()
         }
     }
 
