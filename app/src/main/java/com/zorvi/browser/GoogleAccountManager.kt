@@ -74,11 +74,13 @@ class GoogleAccountManager(context: Context) {
         connection.disconnect()
         require(code in 200..299) { "Google rejected the sign-in token (HTTP $code)" }
         val claims = JSONObject(body)
+        require(claims.optString("iss") in setOf("https://accounts.google.com", "accounts.google.com")) { "Google token issuer was invalid" }
         require(claims.optString("aud") == expectedAudience) { "Google token audience did not match this app" }
+        val expiresAt = claims.optLong("exp", 0L)
+        require(expiresAt > System.currentTimeMillis() / 1000L) { "Google sign-in token has expired" }
         require(claims.optString("email_verified") == "true") { "Google account email is not verified" }
         require(claims.optString("sub").isNotBlank()) { "Google account identifier is missing" }
-        val tokenNonce = claims.optString("nonce")
-        require(tokenNonce.isBlank() || tokenNonce == expectedNonce) { "Google sign-in nonce did not match" }
+        require(claims.optString("nonce") == expectedNonce) { "Google sign-in nonce did not match" }
         return claims
     }
 }
