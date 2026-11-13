@@ -175,6 +175,10 @@ class MainActivity : Activity() {
         if (novaAuth.currentEmail() == null) "Account" else "Account ✓"
 
     private fun showAccount() {
+        if (guestMode) {
+            Toast.makeText(this, "Nova account actions are disabled in Guest Mode.", Toast.LENGTH_SHORT).show()
+            return
+        }
         if (!novaAuth.isConfigured) {
             AlertDialog.Builder(this).setTitle("Nova account setup required")
                 .setMessage("Connect Nova to Supabase first. Add the Supabase Project URL and publishable anon key to NovaSupabaseConfig.kt, then enable Email authentication in Supabase.")
@@ -568,6 +572,10 @@ class MainActivity : Activity() {
     }
 
     private fun translateCurrentPageOffline() {
+        if (current()?.guest == true) {
+            Toast.makeText(this, "On-device model downloads are disabled in Guest Mode.", Toast.LENGTH_LONG).show()
+            return
+        }
         val tab = current() ?: return
         if (!tab.url.startsWith("http://") && !tab.url.startsWith("https://")) {
             Toast.makeText(this, "Open a webpage first", Toast.LENGTH_SHORT).show(); return
