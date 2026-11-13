@@ -92,6 +92,7 @@ class MainActivity : Activity() {
         }
         controls.addView(tabsLabel)
         controls.addView(button("Group") { assignTabGroup() })
+        controls.addView(button("VPN") { openVpnSettings() })
         controls.addView(button("Private") { togglePrivate() })
         controls.addView(button("☾") { toggleDark() })
         root.addView(controls)
@@ -252,6 +253,13 @@ class MainActivity : Activity() {
         active = active.coerceAtMost(tabs.lastIndex)
         showOnlyActive()
         updateTabs()
+    }
+
+    private fun openVpnSettings() {
+        val intent = android.content.Intent(android.provider.Settings.ACTION_VPN_SETTINGS)
+        runCatching { startActivity(intent) }.onFailure {
+            Toast.makeText(this, "Open Android Settings → Network & internet → VPN, then connect Turbo VPN", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun togglePrivate() {
