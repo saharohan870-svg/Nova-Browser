@@ -36,4 +36,4 @@ class NovaVaultCryptoTest {
             // Expected: GCM authentication rejects modified ciphertext.
         }
     }
-}}
+}
