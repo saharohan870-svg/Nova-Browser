@@ -49,10 +49,10 @@ This is not a full Chromium distribution. GeckoView is a separate Firefox/Gecko 
 Nova's Android account flow uses the Supabase Auth REST API directly. Firebase Authentication and Firebase Cloud Functions are not used.
 
 1. In Supabase, open **Authentication → Sign In / Providers → Email** and make sure Email is enabled.
-2. For passwordless email sign-in, open **Authentication → Email Templates → Magic Link**. Use the six-digit token in the message body (\`{{ .Token }}\`) instead of relying only on \`{{ .ConfirmationURL }}\`.
-3. For password recovery by code, open **Authentication → Email Templates → Reset Password** and include \`{{ .Token }}\` in the message. Nova verifies this code as a recovery OTP, then updates the password using the recovery session.
+2. For passwordless email sign-in, open **Authentication → Email Templates → Magic Link**. Use the six-digit token in the message body (`{{ .Token }}`) instead of relying only on `{{ .ConfirmationURL }}`.
+3. For password recovery by code, open **Authentication → Email Templates → Reset Password** and include `{{ .Token }}` in the message. Nova verifies this code as a recovery OTP, then updates the password using the recovery session.
 4. Keep the email OTP length at six digits and choose an expiry suitable for your app. Configure a custom SMTP provider before production; Supabase's default email service is rate-limited.
-5. The Android app is configured in \`app/src/main/java/com/zorvi/browser/NovaSupabaseConfig.kt\` with the project URL and publishable key. Only the publishable key belongs in the APK; never put a Supabase secret/service-role key in Android code.
+5. The Android app is configured in `app/src/main/java/com/zorvi/browser/NovaSupabaseConfig.kt` with the project URL and publishable key. Only the publishable key belongs in the APK; never put a Supabase secret/service-role key in Android code.
 6. After email templates are saved, build and install the APK. Test password sign-up and confirmation, password sign-in, email OTP sign-in, recovery OTP + password update, sign-out, and session restoration after force-closing/reopening Nova.
 
-The app encrypts its saved access and refresh tokens with an Android Keystore AES-GCM key. Publishable keys are sent only in the \`apikey\` header; the \`Authorization\` header is reserved for a real user access token.
+The app encrypts its saved access and refresh tokens with an Android Keystore AES-GCM key. Publishable keys are sent only in the `apikey` header; the `Authorization` header is reserved for a real user access token.
