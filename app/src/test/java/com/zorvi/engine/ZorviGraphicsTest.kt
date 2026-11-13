@@ -1,6 +1,7 @@
 package com.zorvi.engine
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ZorviGraphicsTest {
@@ -21,5 +22,23 @@ class ZorviGraphicsTest {
         assertEquals(1f, command.bounds.left)
         assertEquals(40f, command.bounds.bottom)
         assertEquals(0xff123456.toInt(), command.color)
+    }
+
+    @Test fun displayListSupportsClippingTransformsAndLayerOpacity() {
+        val clip = ZorviPaintCommand.ClipRect(ZorviRect(0f, 0f, 100f, 80f))
+        val translate = ZorviPaintCommand.Translate(12f, 18f)
+        val scale = ZorviPaintCommand.Scale(2f, 2f, 4f, 5f)
+        val rotate = ZorviPaintCommand.Rotate(45f, 10f, 10f)
+        val layer = ZorviPaintCommand.SaveLayerAlpha(ZorviRect(0f, 0f, 100f, 100f), 128)
+        assertTrue(clip.bounds.right == 100f)
+        assertEquals(12f, translate.dx)
+        assertEquals(2f, scale.sx)
+        assertEquals(45f, rotate.degrees)
+        assertEquals(128, layer.alpha)
+    }
+
+    @Test fun fontResolverAcceptsGenericFamiliesAndStyles() {
+        assertEquals(android.graphics.Typeface.BOLD_ITALIC, ZorviFontResolver.resolve("serif", 700, true).style)
+        assertEquals(android.graphics.Typeface.NORMAL, ZorviFontResolver.resolve("monospace").style)
     }
 }
