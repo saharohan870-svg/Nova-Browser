@@ -27,6 +27,14 @@ An Android browser prototype with a Chrome-inspired interface, powered exclusive
 - Page-crash recovery actions and low-memory session handling
 - Close-other-tabs, duplicate, pin/unpin, tab search and recently closed tabs
 
+## Tor-backed Guest Mode
+
+Nova embeds Guardian Project's Tor Android service for Guest Mode. Nova waits for Tor bootstrap to complete before opening guest tabs, then creates a GeckoView runtime configured for the local SOCKS5 listener, remote DNS, and no direct proxy fallback. WebRTC, HTTP/3, DNS prefetch, and speculative connections are disabled in that runtime to reduce common bypass paths.
+
+Entering Guest Mode saves and suspends regular tabs, then switches the browser runtime to Tor. Guest tabs use GeckoView private sessions. Guest Mode does not save browsing history or tab state, and it hides regular bookmarks, history, and downloads. Website permissions, Android permissions, camera/microphone access, native account actions, and on-device translation model downloads are denied or disabled while guest browsing. External app links are blocked. Ending Guest Mode closes guest tabs, stops the Tor service, and restores the regular browser runtime and saved tabs.
+
+**Important limitation:** Tor-routed GeckoView is not the Tor Browser. It does not include Tor Browser's full fingerprinting defenses, hardened browser configuration, or equivalent anonymity set. The built-in Tor connection check opens `https://check.torproject.org/`; verify the route on a real device before relying on it. Do not assume that Tor hides information you deliberately submit to a website.
+
 ## Engine architecture
 
 Nova uses GeckoView as its only page-rendering engine. GeckoView supplies standards-based HTML, CSS, JavaScript, HTTP/HTTPS, TLS, image/font loading, accessibility integration, graphics compositing, and browser networking. Nova no longer maintains a second in-app HTML renderer or JavaScript engine. The former Zorvi prototype's standalone parser, layout, graphics, QuickJS, HTTP loader, and experimental page Activity are retired because they duplicated incomplete browser-engine functionality. Their security, caching, resource-loading, URL, and accessibility requirements remain Nova/GeckoView integration and regression-test requirements.
