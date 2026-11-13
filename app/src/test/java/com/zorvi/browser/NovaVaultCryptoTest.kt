@@ -22,11 +22,18 @@ class NovaVaultCryptoTest {
         NovaVaultCrypto.decrypt(envelope, "a different long passphrase".toCharArray())
     }
 
-    @Test(expected = javax.crypto.AEADBadTagException::class)
+    @Test
     fun modifiedCiphertextIsRejected() {
         val envelope = NovaVaultCrypto.encrypt("private vault data", "a sufficiently long passphrase".toCharArray())
         val changed = JSONObject(envelope.toString())
-        changed.put("ciphertext", changed.getString("ciphertext").dropLast(2) + "AA")
-        NovaVaultCrypto.decrypt(changed, "a sufficiently long passphrase".toCharArray())
+        val bytes = java.util.Base64.getDecoder().decode(changed.getString("ciphertext"))
+        bytes[0] = (bytes[0].toInt() xor 1).toByte()
+        changed.put("ciphertext", java.util.Base64.getEncoder().encodeToString(bytes))
+        try {
+            NovaVaultCrypto.decrypt(changed, "a sufficiently long passphrase".toCharArray())
+            throw AssertionError("Modified ciphertext must not decrypt.")
+        } catch (_: javax.crypto.AEADBadTagException) {
+            // Expected: GCM authentication rejects modified ciphertext.
+        }
     }
-}
+}}
