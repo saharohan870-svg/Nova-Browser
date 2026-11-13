@@ -20,6 +20,9 @@ import android.util.Base64
 class GitHubAccountManager(context: Context) {
     private val prefs = context.getSharedPreferences("zorvi_github_account", Context.MODE_PRIVATE)
     private val alias = "zorvi_github_token_key"
+    @Volatile private var pollingIntervalSeconds = 5
+
+    fun nextPollIntervalSeconds(): Int = pollingIntervalSeconds.coerceAtLeast(5)
 
     data class DeviceCode(
         val deviceCode: String,
@@ -35,11 +38,17 @@ class GitHubAccountManager(context: Context) {
         require(clientId.isNotBlank()) { "GitHub OAuth client ID is required" }
         val body = "client_id=" + enc(clientId) + "&scope=" + enc("read:user codespace")
         val json = postForm("https://github.com/login/device/code", body)
+        val verificationUri = json.optString("verification_uri", "https://github.com/login/device")
+        val parsedUri = URL(verificationUri)
+        require(parsedUri.protocol == "https" && parsedUri.host == "github.com") {
+            "GitHub returned an unexpected authorization URL"
+        }
+        pollingIntervalSeconds = json.optInt("interval", 5).coerceAtLeast(5)
         return DeviceCode(
             deviceCode = json.getString("device_code"),
             userCode = json.getString("user_code"),
-            verificationUri = json.optString("verification_uri", "https://github.com/login/device"),
-            intervalSeconds = json.optInt("interval", 5),
+            verificationUri = verificationUri,
+            intervalSeconds = pollingIntervalSeconds,
             expiresInSeconds = json.optInt("expires_in", 900)
         )
     }
@@ -61,16 +70,24 @@ class GitHubAccountManager(context: Context) {
         connection.disconnect()
         val token = json.optString("access_token").takeIf { it.isNotBlank() }
         if (token != null) {
+            getJson("https://api.github.com/user", token)
             saveToken(token)
             return token
         }
         val error = json.optString("error")
-        if (error == "authorization_pending" || error == "slow_down") return null
+        if (error == "authorization_pending") return null
+        if (error == "slow_down") {
+            pollingIntervalSeconds += 5
+            return null
+        }
         throw IllegalStateException(json.optString("error_description", error.ifBlank { "GitHub authorization failed" }))
     }
 
     fun disconnect() {
-        prefs.edit().remove("token_iv").remove("token_ciphertext").apply()
+        prefs.edit().remove("token_iv").remove("token_ciphertext").commit()
+        runCatching {
+            KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(alias)
+        }
     }
 
     fun accountSummary(): String {
