@@ -81,6 +81,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        dark = prefs.getBoolean("dark_mode", false)
         buildUi()
         applyCookiePolicy()
         restoreTabs()
@@ -151,7 +152,11 @@ class MainActivity : Activity() {
         controls.addView(button("VPN") { showVpnStatus() })
         controls.addView(button("Private") { togglePrivate() })
         controls.addView(button(if (guestMode) "End Guest" else "Guest Mode") { if (guestMode) endGuestMode() else startGuestMode() })
-        controls.addView(button("☾") { dark = !dark; applyTheme() })
+        controls.addView(button("☾") {
+            dark = !dark
+            prefs.edit().putBoolean("dark_mode", dark).apply()
+            applyTheme()
+        })
         root.addView(HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
             addView(controls)
@@ -869,16 +874,39 @@ class MainActivity : Activity() {
         val actions = arrayOf("Open group ($count tabs)", "Move current tab here", "Rename group", "Delete group")
         AlertDialog.Builder(this).setTitle(name).setItems(actions) { _, which ->
             when (which) {
-                0 -> {
-                    val found = tabs.indexOfLast { !it.private && it.group == name }
-                    if (found >= 0) { active = found; showOnlyActive(); updateTabs() }
-                    else { prefs.edit().putString("active_group", name).apply(); newTab(homePage()) }
-                }
+                0 -> showGroupTabs(name)
                 1 -> moveCurrentTabToGroup(name)
                 2 -> renameGroup(name)
                 3 -> deleteGroup(name)
             }
         }.setNegativeButton("Back") { _, _ -> manageGroups() }.show()
+    }
+
+    private fun showGroupTabs(name: String) {
+        val matches = tabs.indices.filter { !tabs[it].private && !tabs[it].guest && tabs[it].group == name }
+        if (matches.isEmpty()) {
+            prefs.edit().putString("active_group", name).apply()
+            newTab(homePage())
+            return
+        }
+        val labels = matches.map { index ->
+            val tab = tabs[index]
+            tab.title.ifBlank { tab.url.ifBlank { "New tab" } }
+        }.toTypedArray()
+        AlertDialog.Builder(this).setTitle("${name} — ${matches.size} tabs")
+            .setItems(labels) { _, which ->
+                active = matches[which]
+                prefs.edit().putString("active_group", name).apply()
+                showOnlyActive()
+                updateTabs()
+            }
+            .setPositiveButton("New tab in group") { _, _ ->
+                prefs.edit().putString("active_group", name).apply()
+                privateMode = false
+                newTab(homePage())
+            }
+            .setNegativeButton("Back") { _, _ -> showGroupActions(name) }
+            .show()
     }
 
     private fun moveCurrentTabToGroup(name: String) {
@@ -1175,7 +1203,7 @@ class MainActivity : Activity() {
                 tabs.size -> newTab(homePage())
                 tabs.size + 1 -> createGroup()
                 tabs.size + 2 -> closeOtherTabs()
-                tabs.size + 3 -> current()?.url?.takeIf { it.startsWith("http") }?.let { newTab(it) }
+                tabs.size + 3 -> duplicateCurrentTab()
                 tabs.size + 4 -> current()?.let { togglePinned(it) }
                 tabs.size + 5 -> searchTabs()
                 tabs.size + 6 -> showRecentlyClosed()
@@ -1185,7 +1213,9 @@ class MainActivity : Activity() {
 
     private fun closeOtherTabs() {
         val keep = current() ?: return
-        tabs.toList().filter { it !== keep }.forEach { tab ->
+        // Pinned tabs survive "Close other tabs", as in mainstream browsers.
+        tabs.toList().filter { it !== keep && !it.pinned }.forEach { tab ->
+            if (!tab.private && !tab.guest) rememberRecentlyClosed(tab.url)
             tabs.remove(tab)
             tab.view.releaseSession()
             if (tab.session.isOpen) tab.session.close()
@@ -1196,17 +1226,39 @@ class MainActivity : Activity() {
         saveTabs()
     }
 
+    private fun rememberRecentlyClosed(url: String) {
+        if (!url.startsWith("https://") && !url.startsWith("http://")) return
+        val recently = runCatching { JSONArray(prefs.getString("recently_closed", "[]")) }.getOrDefault(JSONArray())
+        val updated = JSONArray().put(url)
+        for (i in 0 until recently.length()) {
+            val old = recently.optString(i)
+            if (old != url && updated.length() < 20) updated.put(old)
+        }
+        prefs.edit().putString("recently_closed", updated.toString()).apply()
+    }
+
+    private fun duplicateCurrentTab() {
+        val source = current() ?: return
+        if (source.guest) {
+            Toast.makeText(this, "Guest tabs cannot be duplicated into another session.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val url = source.url.takeIf { it.startsWith("https://") || it.startsWith("http://") } ?: "about:blank"
+        val oldPrivate = privateMode
+        privateMode = source.private
+        try {
+            newTab(url)
+            tabs.lastOrNull()?.group = source.group
+            tabs.lastOrNull()?.pinned = false
+            saveTabs()
+        } finally {
+            privateMode = oldPrivate
+        }
+    }
+
     private fun closeTab() {
         val removed = current() ?: return
-        if (!removed.private && !removed.guest && (removed.url.startsWith("https://") || removed.url.startsWith("http://"))) {
-            val recently = runCatching { JSONArray(prefs.getString("recently_closed", "[]")) }.getOrDefault(JSONArray())
-            val updated = JSONArray().put(removed.url)
-            for (i in 0 until recently.length()) {
-                val old = recently.optString(i)
-                if (old != removed.url && updated.length() < 20) updated.put(old)
-            }
-            prefs.edit().putString("recently_closed", updated.toString()).apply()
-        }
+        if (!removed.private && !removed.guest) rememberRecentlyClosed(removed.url)
         tabs.removeAt(active)
         removed.session.setActive(false)
         removed.view.releaseSession()
