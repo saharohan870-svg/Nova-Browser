@@ -46,13 +46,13 @@ This is not a full Chromium distribution. GeckoView is a separate Firefox/Gecko 
 
 ## Supabase authentication setup
 
-Nova's Android account flow uses the Supabase Auth REST API directly; Firebase Authentication and Firebase Cloud Functions are not used.
+Nova's Android account flow uses the Supabase Auth REST API directly. Firebase Authentication and Firebase Cloud Functions are not used.
 
-1. Create a Supabase project at https://supabase.com/dashboard.
-2. Open Project Settings → API (or API Keys in the current dashboard) and copy the Project URL and the publishable key (or legacy anon public key).
-3. Put those values in `app/src/main/java/com/zorvi/browser/NovaSupabaseConfig.kt` as `PROJECT_URL` and `ANON_KEY`.
-4. In Authentication → Providers, enable Email. For six-digit codes, configure the email OTP template to render the token using `{{ .Token }}` rather than only a magic-link URL.
-5. Set the desired email confirmation and OTP expiry policies in Supabase Auth settings. Configure SMTP for reliable production delivery; the default email service is rate-limited.
-6. Build and install the APK. Test sign-up, password sign-in, OTP request/verification, password recovery and sign-out.
+1. In Supabase, open **Authentication → Sign In / Providers → Email** and make sure Email is enabled.
+2. For passwordless email sign-in, open **Authentication → Email Templates → Magic Link**. Use the six-digit token in the message body (\`{{ .Token }}\`) instead of relying only on \`{{ .ConfirmationURL }}\`.
+3. For password recovery by code, open **Authentication → Email Templates → Reset Password** and include \`{{ .Token }}\` in the message. Nova verifies this code as a recovery OTP, then updates the password using the recovery session.
+4. Keep the email OTP length at six digits and choose an expiry suitable for your app. Configure a custom SMTP provider before production; Supabase's default email service is rate-limited.
+5. The Android app is configured in \`app/src/main/java/com/zorvi/browser/NovaSupabaseConfig.kt\` with the project URL and publishable key. Only the publishable key belongs in the APK; never put a Supabase secret/service-role key in Android code.
+6. After email templates are saved, build and install the APK. Test password sign-up and confirmation, password sign-in, email OTP sign-in, recovery OTP + password update, sign-out, and session restoration after force-closing/reopening Nova.
 
-Only the project URL and publishable/anon client key belong in the Android app. Never put the Supabase `service_role` or secret key in the APK or repository. Supabase project credentials are still required before account features can work.
+The app encrypts its saved access and refresh tokens with an Android Keystore AES-GCM key. Publishable keys are sent only in the \`apikey\` header; the \`Authorization\` header is reserved for a real user access token.
