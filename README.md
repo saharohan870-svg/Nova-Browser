@@ -42,3 +42,17 @@ Open this repository in Android Studio, allow Gradle sync, then run the `app` co
 ## Known limitations
 
 This is not a full Chromium distribution. GeckoView is a separate Firefox/Gecko engine; it does not guarantee identical Chromium behavior or every site's support.  The bundled blocker implements a practical subset of Adblock Plus filter syntax for EasyList/EasyPrivacy. It does not yet support every uBlock Origin/ABP advanced feature (such as procedural cosmetic rules, redirects, scriptlets, CSP and all modifiers), so it is not feature-equivalent to uBlock Origin. Some site-specific ads may remain.
+
+
+## Supabase authentication setup
+
+Nova's Android account flow uses the Supabase Auth REST API directly; Firebase Authentication and Firebase Cloud Functions are not used.
+
+1. Create a Supabase project at https://supabase.com/dashboard.
+2. Open Project Settings → API (or API Keys in the current dashboard) and copy the Project URL and the publishable key (or legacy anon public key).
+3. Put those values in `app/src/main/java/com/zorvi/browser/NovaSupabaseConfig.kt` as `PROJECT_URL` and `ANON_KEY`.
+4. In Authentication → Providers, enable Email. For six-digit codes, configure the email OTP template to render the token using `{{ .Token }}` rather than only a magic-link URL.
+5. Set the desired email confirmation and OTP expiry policies in Supabase Auth settings. Configure SMTP for reliable production delivery; the default email service is rate-limited.
+6. Build and install the APK. Test sign-up, password sign-in, OTP request/verification, password recovery and sign-out.
+
+Only the project URL and publishable/anon client key belong in the Android app. Never put the Supabase `service_role` or secret key in the APK or repository. Supabase project credentials are still required before account features can work.
