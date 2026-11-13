@@ -238,12 +238,17 @@ class MainActivity : Activity() {
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
             isSingleLine = true
         }
+        val otpLogin = Button(this).apply {
+            text = "Sign in with email OTP"
+            isAllCaps = false
+        }
         val fields = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(28, 8, 28, 0)
             addView(email)
             addView(password)
             addView(confirm)
+            addView(otpLogin)
         }
         val dialog = AlertDialog.Builder(this).setTitle("Sign in to Nova")
             .setMessage("Use your email and password, or create a new Nova account.")
@@ -253,6 +258,27 @@ class MainActivity : Activity() {
             .setNegativeButton("Forgot password", null)
             .create()
         dialog.setOnShowListener {
+            otpLogin.setOnClickListener {
+                val address = email.text.toString().trim()
+                if (!android.util.Patterns.EMAIL_ADDRESS.matcher(address).matches()) {
+                    email.error = "Enter a valid email address"
+                    return@setOnClickListener
+                }
+                otpLogin.isEnabled = false
+                NovaEmailOtp.requestCode(address) { success, message ->
+                    runOnUiThread {
+                        otpLogin.isEnabled = true
+                        if (success) {
+                            dialog.dismiss()
+                            showEmailOtpVerification(address)
+                        } else {
+                            AlertDialog.Builder(this).setTitle("Email OTP")
+                                .setMessage(message ?: "Could not request a code. Try again.")
+                                .setPositiveButton("OK", null).show()
+                        }
+                    }
+                }
+            }
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val address = email.text.toString().trim()
                 val secret = password.text.toString()
@@ -337,6 +363,57 @@ class MainActivity : Activity() {
                     Toast.makeText(this,
                         if (task.isSuccessful) "If an account exists, a password-reset email has been sent." else "Could not send reset email. Check the address and try again.",
                         Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun showEmailOtpVerification(emailAddress: String) {
+        val code = EditText(this).apply {
+            hint = "6-digit email code"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            isSingleLine = true
+            filters = arrayOf(android.text.InputFilter.LengthFilter(6))
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Verify email OTP")
+            .setMessage("Enter the 6-digit code sent to $emailAddress. It expires after 10 minutes.")
+            .setView(code)
+            .setPositiveButton("Verify", null)
+            .setNegativeButton("Cancel", null)
+            .setNeutralButton("Resend code", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val entered = code.text.toString().trim()
+                if (!entered.matches(Regex("\\d{6}"))) {
+                    code.error = "Enter all 6 digits"
+                    return@setOnClickListener
+                }
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
+                NovaEmailOtp.verifyCode(emailAddress, entered) { success, message ->
+                    runOnUiThread {
+                        if (success) {
+                            dialog.dismiss()
+                            refreshAccountButton()
+                            Toast.makeText(this, "Signed in to Nova", Toast.LENGTH_LONG).show()
+                        } else {
+                            dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = true
+                            AlertDialog.Builder(this).setTitle("OTP verification failed")
+                                .setMessage(message ?: "The code is invalid or expired.")
+                                .setPositiveButton("OK", null).show()
+                        }
+                    }
+                }
+            }
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                dialog.getButton(AlertDialog.BUTTON_NEUTRAL).isEnabled = false
+                NovaEmailOtp.requestCode(emailAddress) { success, message ->
+                    runOnUiThread {
+                        dialog.getButton(AlertDialog.BUTTON_NEUTRAL).isEnabled = true
+                        Toast.makeText(this, message ?: if (success) "A new code was sent." else "Could not resend code.", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         }
