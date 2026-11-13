@@ -1845,18 +1845,19 @@ class MainActivity : Activity() {
                         val config = File(context.filesDir, "nova-gecko-tor.yaml")
                         val configText = listOf(
                             "prefs:",
-                            "  network.proxy.type: 1",
-                            "  network.proxy.socks: 127.0.0.1",
-                            "  network.proxy.socks_port: $torSocksPort",
-                            "  network.proxy.socks_version: 5",
-                            "  network.proxy.socks_remote_dns: true",
-                            "  network.proxy.no_proxies_on: ''",
-                            "  network.proxy.failover_direct: false",
-                            "  network.dns.disablePrefetch: true",
-                            "  network.prefetch-next: false",
-                            "  network.http.speculative-parallel-limit: 0",
-                            "  network.http.http3.enable: false",
-                            "  media.peerconnection.enabled: false"
+                            "  network.proxy.type.int: 1",
+                            "  network.proxy.socks.string: 127.0.0.1",
+                            "  network.proxy.socks_port.int: $torSocksPort",
+                            "  network.proxy.socks_version.int: 5",
+                            "  network.proxy.socks_remote_dns.boolean: true",
+                            "  network.proxy.no_proxies_on.string: ''",
+                            "  network.proxy.failover_direct.boolean: false",
+                            "  network.dns.disablePrefetch.boolean: true",
+                            "  network.prefetch-next.boolean: false",
+                            "  network.http.speculative-parallel-limit.int: 0",
+                            "  network.http.http3.enable.boolean: false",
+                            "  media.peerconnection.enabled.boolean: false",
+                            "  privacy.resistFingerprinting.boolean: true"
                         ).joinToString("\n")
                         config.writeText(configText)
                         settings.configFilePath(config.absolutePath)
