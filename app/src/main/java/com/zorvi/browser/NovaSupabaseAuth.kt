@@ -31,7 +31,7 @@ internal class NovaSupabaseAuth(context: Context) {
 
     val isConfigured: Boolean
         get() = NovaSupabaseConfig.PROJECT_URL.startsWith("https://") &&
-            NovaSupabaseConfig.ANON_KEY.startsWith("sb_publishable_")
+            NovaSupabaseConfig.PUBLISHABLE_KEY.startsWith("sb_publishable_")
 
     fun currentEmail(): String? = sessionStore.read()?.optString("email")?.takeIf { it.isNotBlank() }
 
@@ -164,7 +164,7 @@ internal class NovaSupabaseAuth(context: Context) {
             readTimeout = 15000
             // Publishable API keys are not JWTs: send them only as apikey.
             // Authorization is reserved for a real Supabase user access token.
-            setRequestProperty("apikey", NovaSupabaseConfig.ANON_KEY)
+            setRequestProperty("apikey", NovaSupabaseConfig.PUBLISHABLE_KEY)
             if (!bearer.isNullOrBlank()) setRequestProperty("Authorization", "Bearer $bearer")
             setRequestProperty("Accept", "application/json")
             if (body != null) {
