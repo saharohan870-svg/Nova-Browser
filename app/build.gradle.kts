@@ -45,4 +45,5 @@ dependencies {
     // Retain the standalone JavaScript engine prototype alongside GeckoView.
     implementation("io.github.dokar3:quickjs-kt-android:1.0.0-alpha13")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }
