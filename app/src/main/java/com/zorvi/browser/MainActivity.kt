@@ -230,6 +230,7 @@ class MainActivity : Activity() {
         return "nova_vault_local_$suffix"
     }
 
+    // Native GeckoView login storage keeps saved credentials out of page JavaScript.
     private fun configureLoginStorage() {
         runtime.setAutocompleteStorageDelegate(object : org.mozilla.geckoview.Autocomplete.StorageDelegate {
             override fun onLoginFetch(domain: String): GeckoResult<Array<org.mozilla.geckoview.Autocomplete.LoginEntry>> {
