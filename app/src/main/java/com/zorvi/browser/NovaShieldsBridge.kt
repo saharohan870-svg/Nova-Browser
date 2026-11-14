@@ -78,6 +78,19 @@ internal class NovaShieldsBridge(private val runtime: GeckoRuntime) {
         activePort.postMessage(JSONObject().put("type", "setSiteMode").put("host", host).put("mode", mode))
     }
 
+    fun setScripts(host: String, blocked: Boolean, callback: (JSONObject?, String?) -> Unit) {
+        val activePort = port
+        if (activePort == null) {
+            callback(null, "Shields bridge is not connected yet.")
+            return
+        }
+        stateCallback = { state ->
+            stateCallback = null
+            callback(state, null)
+        }
+        activePort.postMessage(JSONObject().put("type", "setScripts").put("host", host).put("blocked", blocked))
+    }
+
     fun update(host: String, callback: (JSONObject?, String?) -> Unit) {
         val activePort = port
         if (activePort == null) {
