@@ -238,7 +238,7 @@ class MainActivity : Activity() {
             override fun onLoginSave(login: org.mozilla.geckoview.Autocomplete.LoginEntry) {
                 val origin = runCatching { Uri.parse(login.origin) }.getOrNull()
                 if (origin?.scheme == "https" && !guestMode && !privateMode) {
-                    loginStore.save(login)
+                    loginStore().save(login)
                     syncWebsiteLogins()
                 }
             }
@@ -281,7 +281,7 @@ class MainActivity : Activity() {
                 val root = if (local.isNullOrBlank()) org.json.JSONObject()
                     else org.json.JSONObject(NovaVaultCrypto.decrypt(org.json.JSONObject(local), passphrase))
                 if (!root.has("entries")) root.put("entries", JSONArray())
-                root.put("websiteLogins", loginStore.exportEntriesForEncryptedSync())
+                root.put("websiteLogins", loginStore().exportEntriesForEncryptedSync())
                 root.put("cookies", cookies)
                 val json = root.toString()
                 val localEnvelope = NovaVaultCrypto.encrypt(json, passphrase)
@@ -310,7 +310,7 @@ class MainActivity : Activity() {
                 val cookies = root.optJSONArray("cookies") ?: JSONArray()
                 val envelope = NovaVaultCrypto.encrypt(json, passphrase)
                 prefs.edit().putString(vaultLocalStorageKey(), envelope.toString()).apply()
-                loginStore.importFromEncryptedSync(json)
+                loginStore().importFromEncryptedSync(json)
                 cookieSyncBridge.importCookies(cookies) { imported, skipped, error ->
                     passphrase.fill('\u0000')
                     val result = error ?: "Restored \$imported secure cookies; skipped \$skipped unsupported or expired cookies."
@@ -328,7 +328,7 @@ class MainActivity : Activity() {
             Toast.makeText(this, "Sign in and leave Guest Mode to manage saved logins.", Toast.LENGTH_SHORT).show()
             return
         }
-        val logins = loginStore.fetch()
+        val logins = loginStore().fetch()
         if (logins.isEmpty()) {
             Toast.makeText(this, "No website passwords saved yet. Sign in to a website and accept Nova's save prompt.", Toast.LENGTH_LONG).show()
             return
@@ -345,7 +345,7 @@ class MainActivity : Activity() {
                         Toast.makeText(this, "Password copied to clipboard.", Toast.LENGTH_LONG).show()
                     }
                     .setNeutralButton("Delete") { _, _ ->
-                        login.guid?.let { loginStore.remove(it) }
+                        login.guid?.let { loginStore().remove(it) }
                         syncWebsiteLogins()
                         Toast.makeText(this, "Saved login deleted.", Toast.LENGTH_SHORT).show()
                     }
@@ -398,7 +398,7 @@ class MainActivity : Activity() {
                             try {
                                 val localEnvelope = NovaVaultCrypto.encrypt(json, localPassphrase)
                                 prefs.edit().putString(vaultLocalStorageKey(), localEnvelope.toString()).apply()
-                                loginStore.importFromEncryptedSync(json)
+                                loginStore().importFromEncryptedSync(json)
                                 vaultSyncPassphrase?.fill('\u0000')
                                 vaultSyncPassphrase = localPassphrase.copyOf()
                                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
@@ -420,7 +420,7 @@ class MainActivity : Activity() {
                     } else {
                         try {
                             val json = NovaVaultCrypto.decrypt(org.json.JSONObject(local), passphrase)
-                            loginStore.importFromEncryptedSync(json)
+                            loginStore().importFromEncryptedSync(json)
                             vaultSyncPassphrase?.fill('\u0000')
                             vaultSyncPassphrase = passphrase.copyOf()
                             syncWebsiteLogins()
@@ -508,7 +508,7 @@ class MainActivity : Activity() {
     private fun saveVaultAndSync(entries: JSONArray, passphrase: CharArray) {
         val json = org.json.JSONObject()
             .put("entries", entries)
-            .put("websiteLogins", loginStore.exportEntriesForEncryptedSync())
+            .put("websiteLogins", loginStore().exportEntriesForEncryptedSync())
             .toString()
         val localPassphrase = passphrase.copyOf()
         val cloudPassphrase = passphrase.copyOf()
@@ -536,7 +536,7 @@ class MainActivity : Activity() {
             val root = if (local.isNullOrBlank()) org.json.JSONObject()
                 else NovaVaultCrypto.decrypt(org.json.JSONObject(local), passphrase).let { org.json.JSONObject(it) }
             if (!root.has("entries")) root.put("entries", JSONArray())
-            root.put("websiteLogins", loginStore.exportEntriesForEncryptedSync())
+            root.put("websiteLogins", loginStore().exportEntriesForEncryptedSync())
             val json = root.toString()
             val envelope = NovaVaultCrypto.encrypt(json, passphrase)
             prefs.edit().putString(vaultLocalStorageKey(), envelope.toString()).apply()
