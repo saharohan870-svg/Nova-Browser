@@ -90,7 +90,7 @@ const checks = [
   ["website file prompt is handled", /override fun onFilePrompt/.test(main)],
   ["website file picker uses ACTION_OPEN_DOCUMENT", /ACTION_OPEN_DOCUMENT/.test(main)],
   ["file picker result is delivered to Gecko", /pendingFileResult/.test(main)],
-  ["search attachment button is visible", /button\("＋"\) \{ pickSearchAttachment\(\) \}/.test(main)],
+  ["search attachment control is visible and wired", /val attach = TextView\(this\)\.apply \{[\s\S]*?text = "＋"[\s\S]*?setOnClickListener \{ pickSearchAttachment\(\) \}/.test(main)],
   ["search attachment picker method exists", /private fun pickSearchAttachment\(\)/.test(main)],
   ["search attachment uses openable documents", /CATEGORY_OPENABLE/.test(main)],
   ["attachment sharing uses ACTION_SEND", /ACTION_SEND/.test(main)],
