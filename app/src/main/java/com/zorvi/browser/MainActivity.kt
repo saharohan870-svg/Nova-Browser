@@ -80,7 +80,16 @@ class MainActivity : Activity() {
     private val novaAuth by lazy { NovaSupabaseAuth(applicationContext) }
     private val cloudSync by lazy { NovaCloudSync(prefs, novaAuth) }
     private val encryptedVaultSync by lazy { NovaEncryptedVaultSync(novaAuth) }
-    private val loginStore by lazy { NovaLoginStore(applicationContext) }
+    private var loginStoreAccount: String? = null
+    private var loginStoreInstance: NovaLoginStore? = null
+    private fun loginStore(): NovaLoginStore {
+        val account = novaAuth.currentEmail()?.trim()?.lowercase() ?: "signed-out"
+        if (loginStoreAccount != account || loginStoreInstance == null) {
+            loginStoreAccount = account
+            loginStoreInstance = NovaLoginStore(applicationContext, account)
+        }
+        return loginStoreInstance!!
+    }
     private val cookieSyncBridge by lazy { NovaCookieSyncBridge(runtime) }
     @Volatile private var vaultSyncPassphrase: CharArray? = null
     private val engines = listOf("Google", "Bing", "DuckDuckGo", "Brave Search")
@@ -224,7 +233,7 @@ class MainActivity : Activity() {
     private fun configureLoginStorage() {
         runtime.setAutocompleteStorageDelegate(object : org.mozilla.geckoview.Autocomplete.StorageDelegate {
             override fun onLoginFetch(domain: String): GeckoResult<Array<org.mozilla.geckoview.Autocomplete.LoginEntry>> {
-                return GeckoResult.fromValue(loginStore.fetch(domain))
+                return GeckoResult.fromValue(loginStore().fetch(domain))
             }
             override fun onLoginSave(login: org.mozilla.geckoview.Autocomplete.LoginEntry) {
                 val origin = runCatching { Uri.parse(login.origin) }.getOrNull()
