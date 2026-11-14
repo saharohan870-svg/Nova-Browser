@@ -41,3 +41,9 @@ test("unsupported procedural or redirect options are ignored safely",()=>{
  assert.equal(Engine.parse("||ads.example^$script,redirect=noop.js"),null);
  assert.equal(Engine.parse("||ads.example^$script")!==null,true);
 });
+
+test("aggressive mode also evaluates first-party filter rules",()=>{
+ const c=Engine.compile(["||cdn.publisher.com^$script,third-party"]);
+ assert.equal(Engine.decide(c,req("https://cdn.publisher.com/app.js"),"publisher.com"),false);
+ assert.equal(Engine.decide(c,req("https://cdn.publisher.com/app.js"),"publisher.com",true),true);
+});
