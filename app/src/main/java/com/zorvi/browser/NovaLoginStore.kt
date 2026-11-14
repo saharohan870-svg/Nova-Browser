@@ -15,8 +15,10 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 
 /** Device-local credential store. Each record is encrypted with a non-exportable Android Keystore key. */
-internal class NovaLoginStore(context: Context) {
-    private val prefs = context.getSharedPreferences("nova_login_store", Context.MODE_PRIVATE)
+internal class NovaLoginStore(context: Context, account: String) {
+    private val accountHash = java.security.MessageDigest.getInstance("SHA-256")
+        .digest(account.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+    private val prefs = context.getSharedPreferences("nova_login_store_$accountHash", Context.MODE_PRIVATE)
     private val alias = "nova.login.store.v1"
     private val lock = Any()
 
