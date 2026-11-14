@@ -3,7 +3,7 @@ nativePort.onMessage.addListener(async message => {
   if (!message || typeof message.type !== "string") return;
   if (message.type === "exportCookies") {
     try {
-      const cookies = await browser.cookies.getAll({});
+      const cookies = (await browser.cookies.getAll({})).filter(cookie => cookie.secure && !cookie.partitionKey);
       // The native app encrypts this payload before it leaves the device.
       nativePort.postMessage({ type: "cookiesExported", cookies });
     } catch (error) {
