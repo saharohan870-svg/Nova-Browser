@@ -34,6 +34,8 @@ jobs:
           packages: platform-tools
       - name: Install required Android SDK packages
         run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;36.0.0"
+      - name: Run 100-case Nova browser regression audit
+        run: node tests/nova-100-regression.test.cjs
       - name: Run repeated Nova regression checks (20 passes)
         shell: bash
         run: |
