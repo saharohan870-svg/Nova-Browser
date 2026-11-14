@@ -4,13 +4,14 @@ const LISTS=[
  {key:"easyprivacy",name:"EasyPrivacy",url:"https://easylist.to/easylist/easyprivacy.txt"}
 ];
 const UPDATE_MS=86400000;
-let compiled=NovaAdblockEngine.compile([]),mode="standard",siteOverrides={},firstParty=new Map(),nativePort=null;
+let compiled=NovaAdblockEngine.compile([]),mode="standard",siteOverrides={},scriptOverrides={},firstParty=new Map(),nativePort=null;
 let stats={blocked:0,updatedAt:0,networkRules:0,cosmeticRules:0};
-function state(host){return {type:"shieldState",host:host||"",enabled:mode!=="off",mode,siteMode:siteOverrides[host||""]||"default",stats:{...stats}};}
+function state(host){return {type:"shieldState",host:host||"",enabled:mode!=="off",mode,siteMode:siteOverrides[host||""]||"default",scriptsBlocked:!!scriptOverrides[host||""],stats:{...stats}};}
 async function rebuild(){
- const saved=await browser.storage.local.get(["filter_easylist","filter_easyprivacy","mode","enabled","siteOverrides","stats"]);
+ const saved=await browser.storage.local.get(["filter_easylist","filter_easyprivacy","mode","enabled","siteOverrides","scriptOverrides","stats"]);
  mode=["standard","aggressive","off"].includes(saved.mode)?saved.mode:(saved.enabled===false?"off":"standard");
  siteOverrides=saved.siteOverrides||{};
+ scriptOverrides=saved.scriptOverrides||{};
  if(saved.stats)stats={...stats,...saved.stats};
  const lines=[];
  for(const list of LISTS)if(Array.isArray(saved["filter_"+list.key]))lines.push(...saved["filter_"+list.key]);
@@ -41,6 +42,7 @@ browser.webRequest.onBeforeRequest.addListener(details=>{
  let host=firstParty.get(details.tabId)||"";
  if(details.type==="main_frame"||!host){try{host=new URL(details.url).hostname;}catch(_){}}
  const override=siteOverrides[host]||"default";
+ if(details.type==="script"&&scriptOverrides[host]){stats.blocked++;return {cancel:true};}
  if(mode==="off"||override==="off")return {};
  const aggressive=mode==="aggressive"||override==="aggressive";
  if(NovaAdblockEngine.decide(compiled,details,host,aggressive)){
@@ -70,6 +72,12 @@ browser.runtime.onMessage.addListener(async message=>{
   await browser.storage.local.set({enabled:mode!=="off",mode});
   return state(message.host);
  }
+ if(message&&message.type==="setScripts"){
+  const host=String(message.host||"").toLowerCase();
+  if(!host||host.length>253||!/^[a-z0-9.-]+$/.test(host))return {error:"Invalid site"};
+  const next={...scriptOverrides};if(message.blocked)next[host]=true;else delete next[host];
+  scriptOverrides=next;await browser.storage.local.set({scriptOverrides});return state(host);
+ }
  if(message&&message.type==="setSiteMode"){
   const host=String(message.host||"").toLowerCase();
   if(!host||host.length>253||!/^[a-z0-9.-]+$/.test(host))return {error:"Invalid site"};
@@ -97,6 +105,11 @@ try{
    mode=["standard","aggressive","off"].includes(message.mode)?message.mode:"standard";
    await browser.storage.local.set({enabled:mode!=="off",mode});
    nativePort.postMessage(state(host));
+  }else if(message.type==="setScripts"){
+   if(host&&host.length<=253&&/^[a-z0-9.-]+$/.test(host)){
+    const next={...scriptOverrides};if(message.blocked)next[host]=true;else delete next[host];
+    scriptOverrides=next;await browser.storage.local.set({scriptOverrides});nativePort.postMessage(state(host));
+   }
   }else if(message.type==="setSiteMode"){
    if(host&&host.length<=253&&/^[a-z0-9.-]+$/.test(host)){
     const next={...siteOverrides};
