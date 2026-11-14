@@ -1,0 +1,22 @@
+{
+  "manifest_version": 2,
+  "name": "Nova Session Sync",
+  "version": "1.0.0",
+  "description": "User-triggered cookie transfer for Nova's encrypted cross-device session sync.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "nova-session-sync@zorvi.browser"
+    }
+  },
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
+  "permissions": [
+    "cookies",
+    "<all_urls>",
+    "nativeMessaging",
+    "geckoViewAddons"
+  ]
+}
