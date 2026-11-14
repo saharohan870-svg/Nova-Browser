@@ -81,6 +81,7 @@ class MainActivity : Activity() {
     private val cloudSync by lazy { NovaCloudSync(prefs, novaAuth) }
     private val encryptedVaultSync by lazy { NovaEncryptedVaultSync(novaAuth) }
     private val loginStore by lazy { NovaLoginStore(applicationContext) }
+    private val cookieSyncBridge by lazy { NovaCookieSyncBridge(runtime) }
     @Volatile private var vaultSyncPassphrase: CharArray? = null
     private val engines = listOf("Google", "Bing", "DuckDuckGo", "Brave Search")
     private val torController by lazy { NovaTorController(applicationContext) }
@@ -93,6 +94,7 @@ class MainActivity : Activity() {
         novaAuth.restoreSession { restored -> refreshAccountButton(); if (restored) syncCloud(showMessage = false) }
         applyCookiePolicy()
         configureLoginStorage()
+        cookieSyncBridge.install { ok, error -> if (!ok) android.util.Log.e("NovaCookieSync", error ?: "Extension setup failed") }
         restoreTabs()
         if (tabs.isEmpty()) newTab(homePage())
     }
@@ -144,6 +146,7 @@ class MainActivity : Activity() {
         controls.addView(button("History") { showSavedList(true) })
         controls.addView(button("Passwords") { showPasswordVault() })
         controls.addView(button("Website Logins") { showSavedWebsiteLogins() })
+        controls.addView(button("Sessions") { showWebsiteSessionSync() })
         tabsLabel = TextView(this).apply {
             text = "Tabs 0"; gravity = Gravity.CENTER; setPadding(7, 12, 7, 12)
             setOnClickListener { showTabs() }
@@ -229,6 +232,83 @@ class MainActivity : Activity() {
                 }
             }
         })
+    }
+
+    private fun showWebsiteSessionSync() {
+        if (guestMode || privateMode || current()?.guest == true || current()?.private == true) {
+            Toast.makeText(this, "Website session sync is disabled in Private and Guest browsing.", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (novaAuth.currentEmail() == null) {
+            Toast.makeText(this, "Sign in to Nova first.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (vaultSyncPassphrase == null) {
+            AlertDialog.Builder(this).setTitle("Unlock encrypted vault first")
+                .setMessage("Unlock or restore your Nova encrypted vault first. Website session cookies are sensitive and will only be transferred after your confirmation.")
+                .setPositiveButton("Open password vault") { _, _ -> showPasswordVault() }
+                .setNegativeButton("Cancel", null).show()
+            return
+        }
+        AlertDialog.Builder(this).setTitle("Website session sync")
+            .setMessage("This transfers secure website cookies, which may keep you signed in on another phone. Only use this on devices you trust. Private and Guest cookies are excluded.")
+            .setPositiveButton("Back up sessions") { _, _ -> backupWebsiteSessions() }
+            .setNeutralButton("Restore sessions") { _, _ -> restoreWebsiteSessions() }
+            .setNegativeButton("Cancel", null).show()
+    }
+
+    private fun backupWebsiteSessions() {
+        val passphrase = vaultSyncPassphrase?.copyOf() ?: return
+        cookieSyncBridge.exportCookies { cookies, error ->
+            if (cookies == null) {
+                passphrase.fill('\u0000')
+                Toast.makeText(this, error ?: "Could not read website sessions.", Toast.LENGTH_LONG).show()
+                return@exportCookies
+            }
+            try {
+                val local = prefs.getString(vaultLocalStorageKey(), null)
+                val root = if (local.isNullOrBlank()) org.json.JSONObject()
+                    else org.json.JSONObject(NovaVaultCrypto.decrypt(org.json.JSONObject(local), passphrase))
+                if (!root.has("entries")) root.put("entries", JSONArray())
+                root.put("websiteLogins", loginStore.exportEntriesForEncryptedSync())
+                root.put("cookies", cookies)
+                val json = root.toString()
+                val localEnvelope = NovaVaultCrypto.encrypt(json, passphrase)
+                prefs.edit().putString(vaultLocalStorageKey(), localEnvelope.toString()).apply()
+                encryptedVaultSync.backup(json, passphrase.copyOf()) { ok, message ->
+                    Toast.makeText(this, if (ok) "Encrypted session backup updated (\${cookies.length()} cookies)." else message, Toast.LENGTH_LONG).show()
+                }
+            } catch (failure: Exception) {
+                Toast.makeText(this, failure.message ?: "Could not encrypt website sessions.", Toast.LENGTH_LONG).show()
+                passphrase.fill('\u0000')
+            }
+        }
+    }
+
+    private fun restoreWebsiteSessions() {
+        val passphrase = vaultSyncPassphrase?.copyOf() ?: return
+        encryptedVaultSync.restore(passphrase.copyOf()) { json, message ->
+            if (json == null) {
+                passphrase.fill('\u0000')
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                return@restore
+            }
+            try {
+                val root = org.json.JSONObject(json)
+                val cookies = root.optJSONArray("cookies") ?: JSONArray()
+                val envelope = NovaVaultCrypto.encrypt(json, passphrase)
+                prefs.edit().putString(vaultLocalStorageKey(), envelope.toString()).apply()
+                loginStore.importFromEncryptedSync(json)
+                cookieSyncBridge.importCookies(cookies) { imported, skipped, error ->
+                    passphrase.fill('\u0000')
+                    val result = error ?: "Restored \$imported secure cookies; skipped \$skipped unsupported or expired cookies."
+                    Toast.makeText(this, result, Toast.LENGTH_LONG).show()
+                }
+            } catch (failure: Exception) {
+                passphrase.fill('\u0000')
+                Toast.makeText(this, failure.message ?: "Could not restore website sessions.", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun showSavedWebsiteLogins() {
