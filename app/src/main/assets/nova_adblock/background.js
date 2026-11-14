@@ -39,7 +39,7 @@ async function updateLists(force){
 }
 browser.webRequest.onBeforeRequest.addListener(details=>{
  let host=firstParty.get(details.tabId)||"";
- if(!host){try{host=new URL(details.url).hostname;}catch(_){}}
+ if(details.type==="main_frame"||!host){try{host=new URL(details.url).hostname;}catch(_){}}
  const override=siteOverrides[host]||"default";
  if(mode==="off"||override==="off")return {};
  const aggressive=mode==="aggressive"||override==="aggressive";
