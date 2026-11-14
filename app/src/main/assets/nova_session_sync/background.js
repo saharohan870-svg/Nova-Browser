@@ -14,10 +14,10 @@ nativePort.onMessage.addListener(async message => {
     let skipped = 0;
     for (const cookie of message.cookies) {
       try {
-        if (!cookie || !cookie.name || typeof cookie.value !== "string") { skipped++; continue; }
+        if (!cookie || !cookie.secure || !cookie.name || typeof cookie.value !== "string") { skipped++; continue; }
         const host = String(cookie.domain || "").replace(/^\\./, "");
         if (!host || !/^[a-z0-9.-]+$/i.test(host) || host.includes("..")) { skipped++; continue; }
-        const url = (cookie.secure ? "https://" : "http://") + host + (cookie.path || "/");
+        const url = "https://" + host + (cookie.path || "/");
         const details = {
           url, name: cookie.name, value: cookie.value,
           path: cookie.path || "/", secure: Boolean(cookie.secure),
