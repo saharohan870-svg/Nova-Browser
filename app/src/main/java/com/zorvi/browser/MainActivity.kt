@@ -80,6 +80,7 @@ class MainActivity : Activity() {
     private val novaAuth by lazy { NovaSupabaseAuth(applicationContext) }
     private val cloudSync by lazy { NovaCloudSync(prefs, novaAuth) }
     private val encryptedVaultSync by lazy { NovaEncryptedVaultSync(novaAuth) }
+    private val loginStore by lazy { NovaLoginStore(applicationContext) }
     private val engines = listOf("Google", "Bing", "DuckDuckGo", "Brave Search")
     private val torController by lazy { NovaTorController(applicationContext) }
     private val runtime: GeckoRuntime get() = getOrCreateRuntime(applicationContext)
@@ -90,6 +91,7 @@ class MainActivity : Activity() {
         buildUi()
         novaAuth.restoreSession { restored -> refreshAccountButton(); if (restored) syncCloud(showMessage = false) }
         applyCookiePolicy()
+        configureLoginStorage()
         restoreTabs()
         if (tabs.isEmpty()) newTab(homePage())
     }
@@ -210,6 +212,18 @@ class MainActivity : Activity() {
             .digest(account.toByteArray(Charsets.UTF_8))
         val suffix = digest.joinToString("") { "%02x".format(it) }
         return "nova_vault_local_$suffix"
+    }
+
+    private fun configureLoginStorage() {
+        runtime.setAutocompleteStorageDelegate(object : org.mozilla.geckoview.Autocomplete.StorageDelegate {
+            override fun onLoginFetch(domain: String): GeckoResult<Array<org.mozilla.geckoview.Autocomplete.LoginEntry>> {
+                return GeckoResult.fromValue(loginStore.fetch(domain))
+            }
+            override fun onLoginSave(login: org.mozilla.geckoview.Autocomplete.LoginEntry) {
+                val origin = runCatching { Uri.parse(login.origin) }.getOrNull()
+                if (origin?.scheme == "https" && !guestMode && !privateMode) loginStore.save(login)
+            }
+        })
     }
 
     private fun showPasswordVault() {
@@ -1114,6 +1128,42 @@ class MainActivity : Activity() {
             }
         })
         session.setPromptDelegate(object : GeckoSession.PromptDelegate {
+            override fun onLoginSave(
+                session: GeckoSession,
+                request: GeckoSession.PromptDelegate.AutocompleteRequest<org.mozilla.geckoview.Autocomplete.LoginSaveOption>
+            ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse> {
+                if (tab.private || tab.guest) return GeckoResult.fromValue(request.dismiss())
+                val option = request.options.firstOrNull() ?: return GeckoResult.fromValue(request.dismiss())
+                val login = option.value
+                val result = GeckoResult<GeckoSession.PromptDelegate.PromptResponse>()
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("Save password?")
+                    .setMessage("Save login for \${login.origin}?\nUsername: \${login.username}")
+                    .setPositiveButton("Save") { _, _ -> result.complete(request.confirm(option)) }
+                    .setNegativeButton("Not now") { _, _ -> result.complete(request.dismiss()) }
+                    .setOnCancelListener { result.complete(request.dismiss()) }
+                    .show()
+                return result
+            }
+
+            override fun onLoginSelect(
+                session: GeckoSession,
+                request: GeckoSession.PromptDelegate.AutocompleteRequest<org.mozilla.geckoview.Autocomplete.LoginSelectOption>
+            ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse> {
+                if (tab.private || tab.guest) return GeckoResult.fromValue(request.dismiss())
+                val options = request.options
+                if (options.isEmpty()) return GeckoResult.fromValue(request.dismiss())
+                if (options.size == 1) return GeckoResult.fromValue(request.confirm(options[0]))
+                val result = GeckoResult<GeckoSession.PromptDelegate.PromptResponse>()
+                val labels = options.map { "\${it.value.username} — \${it.value.origin}" }.toTypedArray()
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("Choose saved login")
+                    .setItems(labels) { _, index -> result.complete(request.confirm(options[index])) }
+                    .setOnCancelListener { result.complete(request.dismiss()) }
+                    .show()
+                return result
+            }
+
             override fun onFilePrompt(session: GeckoSession, prompt: GeckoSession.PromptDelegate.FilePrompt): GeckoResult<GeckoSession.PromptDelegate.PromptResponse> {
                 val result = GeckoResult<GeckoSession.PromptDelegate.PromptResponse>()
                 pendingFilePrompt = prompt
