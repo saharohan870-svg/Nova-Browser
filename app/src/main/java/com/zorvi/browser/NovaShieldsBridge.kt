@@ -15,6 +15,10 @@ internal class NovaShieldsBridge(private val runtime: GeckoRuntime) {
             "resource://android/assets/nova_adblock/",
             "nova-adblock@zorvi.browser"
         ).accept({ extension ->
+            if (extension == null) {
+                callback(false, "Extension installation returned no extension.")
+                return@accept
+            }
             val delegate = object : WebExtension.MessageDelegate {
                 override fun onConnect(port: WebExtension.Port) {
                     this@NovaShieldsBridge.port = port
@@ -35,7 +39,7 @@ internal class NovaShieldsBridge(private val runtime: GeckoRuntime) {
             callback(true, null)
         }, { error ->
             Log.e("NovaShields", "Could not install Shields extension", error)
-            callback(false, error.message ?: "Could not install Shields extension.")
+            callback(false, error?.message ?: "Could not install Shields extension.")
         })
     }
 
