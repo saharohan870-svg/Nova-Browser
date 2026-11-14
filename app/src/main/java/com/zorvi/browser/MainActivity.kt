@@ -204,6 +204,8 @@ class MainActivity : Activity() {
                     novaAuth.signOut {
                         runOnUiThread {
                             refreshAccountButton()
+                            vaultSyncPassphrase?.fill('\\u0000')
+                            vaultSyncPassphrase = null
                             Toast.makeText(this, "Signed out", Toast.LENGTH_SHORT).show()
                         }
                     }
@@ -276,6 +278,7 @@ class MainActivity : Activity() {
                 val localEnvelope = NovaVaultCrypto.encrypt(json, passphrase)
                 prefs.edit().putString(vaultLocalStorageKey(), localEnvelope.toString()).apply()
                 encryptedVaultSync.backup(json, passphrase.copyOf()) { ok, message ->
+                    passphrase.fill('\u0000')
                     Toast.makeText(this, if (ok) "Encrypted session backup updated (\${cookies.length()} cookies)." else message, Toast.LENGTH_LONG).show()
                 }
             } catch (failure: Exception) {
@@ -403,6 +406,7 @@ class MainActivity : Activity() {
                     if (local.isNullOrBlank()) {
                         vaultSyncPassphrase?.fill('\u0000')
                         vaultSyncPassphrase = passphrase.copyOf()
+                        syncWebsiteLogins()
                         showVaultEntries("{\"entries\":[]}", passphrase)
                     } else {
                         try {
@@ -410,6 +414,7 @@ class MainActivity : Activity() {
                             loginStore.importFromEncryptedSync(json)
                             vaultSyncPassphrase?.fill('\u0000')
                             vaultSyncPassphrase = passphrase.copyOf()
+                            syncWebsiteLogins()
                             showVaultEntries(json, passphrase.copyOf())
                             passphrase.fill('\u0000')
                         } catch (error: Exception) {
@@ -2225,6 +2230,8 @@ class MainActivity : Activity() {
             if (tab.session.isOpen) tab.session.close()
         }
         tabs.clear()
+        vaultSyncPassphrase?.fill('\u0000')
+        vaultSyncPassphrase = null
         if (guestMode) resetRuntime(false, 0)
         torController.stop()
         super.onDestroy()
