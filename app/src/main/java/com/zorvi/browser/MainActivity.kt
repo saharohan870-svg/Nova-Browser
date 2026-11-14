@@ -847,9 +847,63 @@ class MainActivity : Activity() {
             }.setNegativeButton("Cancel", null).show()
     }
 
+    private fun showDescribedOptions(
+        title: String,
+        options: List<Pair<String, String>>,
+        selectedIndex: Int = -1,
+        onSelect: (Int) -> Unit
+    ) {
+        val list = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(20, 8, 20, 8)
+        }
+        val dialog = AlertDialog.Builder(this).setTitle(title).setView(ScrollView(this).apply {
+            addView(list)
+        }).setNegativeButton("Close", null).create()
+        options.forEachIndexed { index, option ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                isClickable = true
+                isFocusable = true
+                setPadding(8, 13, 8, 13)
+                if (selectedIndex == index) setBackgroundColor(Color.argb(24, 40, 120, 220))
+            }
+            row.addView(TextView(this).apply {
+                text = (if (selectedIndex == index) "✓  " else "") + option.first
+                textSize = 15f
+                setTextColor(if (selectedIndex == index) Color.rgb(40, 120, 220) else Color.BLACK)
+            })
+            row.addView(TextView(this).apply {
+                text = option.second
+                textSize = 12f
+                setTextColor(Color.DKGRAY)
+                setPadding(30, 4, 4, 0)
+            })
+            row.setOnClickListener {
+                dialog.dismiss()
+                onSelect(index)
+            }
+            list.addView(row)
+            if (index != options.lastIndex) {
+                list.addView(View(this).apply {
+                    setBackgroundColor(Color.LTGRAY)
+                    layoutParams = LinearLayout.LayoutParams(-1, 1)
+                })
+            }
+        }
+        dialog.show()
+    }
+
     private fun showAdvancedTools() {
-        val actions = arrayOf("Ask AI assistant", "Summarize current page with AI", "Translate current page", "Translation language", "Reader view", "Customize home page")
-        AlertDialog.Builder(this).setTitle("Nova tools").setItems(actions) { _, which ->
+        val options = listOf(
+            "Ask AI assistant" to "Ask a question using ChatGPT or Perplexity.",
+            "Summarize current page" to "Extract readable text from the open page and ask an AI to summarize it.",
+            "Translate current page" to "Translate page content using the on-device translation service when available.",
+            "Translation language" to "Choose the target language used by page translation.",
+            "Reader view" to "Show a simplified, readable version of the current article.",
+            "Customize home page" to "Choose the website opened by Home and new tabs."
+        )
+        showDescribedOptions("Nova tools", options) { which ->
             when (which) {
                 0 -> askAiAssistant()
                 1 -> summarizeCurrentPage()
@@ -858,7 +912,7 @@ class MainActivity : Activity() {
                 4 -> openReaderView()
                 5 -> customizeHomePage()
             }
-        }.show()
+        }
     }
 
     private fun chooseAiProvider(prompt: String, title: String) {
@@ -1207,49 +1261,43 @@ class MainActivity : Activity() {
     }
 
     private fun chooseGlobalShieldMode(host: String, currentMode: String) {
-        val labels = arrayOf(
-            "Standard — block third-party ads and trackers",
-            "Aggressive — also apply filters to first-party requests",
-            "Off — disable Nova's filter blocking"
-        )
         val values = arrayOf("standard", "aggressive", "off")
-        val selected = values.indexOf(currentMode).coerceAtLeast(0)
-        AlertDialog.Builder(this).setTitle("Global Shields protection")
-            .setSingleChoiceItems(labels, selected) { dialog, which ->
-                shieldsBridge.setMode(host, values[which]) { state, error ->
-                    runOnUiThread {
-                        dialog.dismiss()
-                        if (state == null) Toast.makeText(this, error ?: "Could not update Shields.", Toast.LENGTH_LONG).show()
-                        else {
-                            Toast.makeText(this, "Global Shields set to " + values[which] + ". Reloading page.", Toast.LENGTH_SHORT).show()
-                            current()?.session?.reload()
-                        }
+        val options = listOf(
+            "Standard" to "Blocks common third-party ads and trackers. A good balance between privacy and website compatibility.",
+            "Aggressive" to "Applies filter rules to first-party requests too. May break images, sign-in flows or other site features.",
+            "Off" to "Turns off Nova's filter-list blocking. Other browser privacy controls may still remain active."
+        )
+        showDescribedOptions("Global Shields protection", options, values.indexOf(currentMode)) { which ->
+            shieldsBridge.setMode(host, values[which]) { state, error ->
+                runOnUiThread {
+                    if (state == null) Toast.makeText(this, error ?: "Could not update Shields.", Toast.LENGTH_LONG).show()
+                    else {
+                        Toast.makeText(this, "Global Shields set to " + values[which] + ". Reloading page.", Toast.LENGTH_SHORT).show()
+                        current()?.session?.reload()
                     }
                 }
-            }.setNegativeButton("Cancel", null).show()
+            }
+        }
     }
 
     private fun chooseSiteShieldMode(host: String, currentMode: String) {
-        val labels = arrayOf(
-            "Use global setting",
-            "Turn Shields off for this site",
-            "Aggressive blocking for this site"
-        )
         val values = arrayOf("default", "off", "aggressive")
-        val selected = values.indexOf(currentMode).coerceAtLeast(0)
-        AlertDialog.Builder(this).setTitle("Shields for " + host)
-            .setSingleChoiceItems(labels, selected) { dialog, which ->
-                shieldsBridge.setSiteMode(host, values[which]) { state, error ->
-                    runOnUiThread {
-                        dialog.dismiss()
-                        if (state == null) Toast.makeText(this, error ?: "Could not update site protection.", Toast.LENGTH_LONG).show()
-                        else {
-                            Toast.makeText(this, "Site protection updated. Reloading page.", Toast.LENGTH_SHORT).show()
-                            current()?.session?.reload()
-                        }
+        val options = listOf(
+            "Use global setting" to "This website follows the Standard, Aggressive or Off mode selected for Nova.",
+            "Turn Shields off for this site" to "Allow filter-listed requests on this website. Use only when the site does not work correctly.",
+            "Aggressive blocking for this site" to "Apply Nova's filter rules to first-party requests on this website too; some site features may stop working."
+        )
+        showDescribedOptions("Shields for " + host, options, values.indexOf(currentMode)) { which ->
+            shieldsBridge.setSiteMode(host, values[which]) { state, error ->
+                runOnUiThread {
+                    if (state == null) Toast.makeText(this, error ?: "Could not update site protection.", Toast.LENGTH_LONG).show()
+                    else {
+                        Toast.makeText(this, "Site protection updated. Reloading page.", Toast.LENGTH_SHORT).show()
+                        current()?.session?.reload()
                     }
                 }
-            }.setNegativeButton("Cancel", null).show()
+            }
+        }
     }
 
     private fun showPrivacyControls() {
@@ -1274,13 +1322,6 @@ class MainActivity : Activity() {
     }
 
     private fun chooseCookiePolicy() {
-        val labels = arrayOf(
-            "Isolate third-party cookies (recommended)",
-            "Block known trackers",
-            "Block all third-party cookies",
-            "Allow all cookies",
-            "Block all cookies"
-        )
         val values = intArrayOf(
             org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_FIRST_PARTY_AND_ISOLATE_OTHERS,
             org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_NON_TRACKERS,
@@ -1288,49 +1329,47 @@ class MainActivity : Activity() {
             org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_ALL,
             org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_NONE
         )
+        val options = listOf(
+            "Isolate third-party cookies" to "Keeps third-party cookies separated by the website using them, reducing cross-site tracking while usually preserving compatibility.",
+            "Block known trackers" to "Blocks cookies identified as tracking cookies while allowing other third-party cookies.",
+            "Block all third-party cookies" to "Only accepts cookies set by the website you are visiting. Some embedded content and sign-in services may fail.",
+            "Allow all cookies" to "Allows first-party and third-party cookies. This offers the broadest compatibility but least cookie-based tracking protection.",
+            "Block all cookies" to "Rejects all cookies. Many websites may not remember sign-ins, preferences or shopping carts."
+        )
         val currentPolicy = prefs.getInt("cookie_policy", values[0])
-        val selected = values.indexOf(currentPolicy).coerceAtLeast(0)
-        AlertDialog.Builder(this).setTitle("Cookie policy")
-            .setSingleChoiceItems(labels, selected) { dialog, which ->
-                val policy = values[which]
-                prefs.edit().putInt("cookie_policy", policy).apply()
-                runtime.settings.contentBlocking.setCookieBehavior(policy)
-                runtime.settings.contentBlocking.setCookieBehaviorPrivateMode(policy)
-                runtime.settings.contentBlocking.setCookiePurging(true)
-                dialog.dismiss()
-                Toast.makeText(this, "Cookie policy updated. Reload pages to apply changes.", Toast.LENGTH_LONG).show()
-            }.setNegativeButton("Cancel", null).show()
+        showDescribedOptions("Cookie policy", options, values.indexOf(currentPolicy).coerceAtLeast(0)) { which ->
+            val policy = values[which]
+            prefs.edit().putInt("cookie_policy", policy).apply()
+            runtime.settings.contentBlocking.setCookieBehavior(policy)
+            runtime.settings.contentBlocking.setCookieBehaviorPrivateMode(policy)
+            runtime.settings.contentBlocking.setCookiePurging(true)
+            Toast.makeText(this, "Cookie policy updated. Reload pages to apply changes.", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun showWebsiteDataControls() {
-        val actions = arrayOf(
-            "Cookie policy",
-            "Clear cookies and site data",
-            "Clear cached files",
-            "Clear all browsing data"
+        val options = listOf(
+            "Cookie policy" to "Choose whether websites can store cookies and how third-party cookies are isolated.",
+            "Clear cookies and site data" to "Signs you out of websites and removes cookies, local storage and saved site permissions.",
+            "Clear cached files" to "Removes cached images and files. Website sign-ins should usually remain.",
+            "Clear all browsing data" to "Clears website data, caches, Nova history, bookmarks and saved tabs. Downloaded files and saved passwords are not deleted."
         )
-        val descriptions = arrayOf(
-            "Signs you out of websites and clears cookies, local storage, site permissions and related site data.",
-            "Removes cached images and files. Website sign-ins should remain.",
-            "Clears Gecko cookies, site storage, permissions and caches, plus Nova history, bookmarks and saved tabs. Downloaded files are not deleted."
-        )
-        AlertDialog.Builder(this).setTitle("Website data")
-            .setItems(actions) { _, which ->
-                if (which == 0) {
-                    chooseCookiePolicy()
-                } else {
-                    val index = which - 1
-                    AlertDialog.Builder(this).setTitle(actions[which]).setMessage(descriptions[index])
-                        .setPositiveButton("Clear") { _, _ ->
-                            val flags = when (index) {
-                                0 -> org.mozilla.geckoview.StorageController.ClearFlags.SITE_DATA
-                                1 -> org.mozilla.geckoview.StorageController.ClearFlags.ALL_CACHES
-                                else -> org.mozilla.geckoview.StorageController.ClearFlags.ALL
-                            }
-                            clearGeckoData(flags, index == 2)
-                        }.setNegativeButton("Cancel", null).show()
-                }
-            }.setNegativeButton("Close", null).show()
+        showDescribedOptions("Website data", options) { which ->
+            if (which == 0) {
+                chooseCookiePolicy()
+            } else {
+                val index = which - 1
+                AlertDialog.Builder(this).setTitle(options[which].first).setMessage(options[which].second)
+                    .setPositiveButton("Clear") { _, _ ->
+                        val flags = when (index) {
+                            0 -> org.mozilla.geckoview.StorageController.ClearFlags.SITE_DATA
+                            1 -> org.mozilla.geckoview.StorageController.ClearFlags.ALL_CACHES
+                            else -> org.mozilla.geckoview.StorageController.ClearFlags.ALL
+                        }
+                        clearGeckoData(flags, index == 2)
+                    }.setNegativeButton("Cancel", null).show()
+            }
+        }
     }
 
     private fun clearGeckoData(flags: Long, clearNovaData: Boolean) {
