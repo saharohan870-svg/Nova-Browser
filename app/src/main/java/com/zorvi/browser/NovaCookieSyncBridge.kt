@@ -17,6 +17,10 @@ internal class NovaCookieSyncBridge(private val runtime: GeckoRuntime) {
             "resource://android/assets/nova_session_sync/",
             "nova-session-sync@zorvi.browser"
         ).accept({ extension ->
+            if (extension == null) {
+                callback(false, "Extension installation returned no extension.")
+                return@accept
+            }
             val delegate = object : WebExtension.MessageDelegate {
                 override fun onConnect(port: WebExtension.Port) {
                     this@NovaCookieSyncBridge.port = port
@@ -53,7 +57,7 @@ internal class NovaCookieSyncBridge(private val runtime: GeckoRuntime) {
             callback(true, null)
         }, { error ->
             Log.e("NovaCookieSync", "Could not install session sync extension", error)
-            callback(false, error.message ?: "Could not install session sync extension.")
+            callback(false, error?.message ?: "Could not install session sync extension.")
         })
     }
 
