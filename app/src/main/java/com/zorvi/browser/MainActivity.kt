@@ -1256,8 +1256,17 @@ class MainActivity : Activity() {
                                 runOnUiThread {
                                     if (updated == null) Toast.makeText(this, updateError ?: "Filter update failed.", Toast.LENGTH_LONG).show()
                                     else {
-                                        Toast.makeText(this, "EasyList and EasyPrivacy filters refreshed.", Toast.LENGTH_LONG).show()
-                                        current()?.session?.reload()
+                                        val stats = updated.optJSONObject("stats")
+                                        val errors = stats?.optJSONArray("updateErrors")
+                                        if (errors != null && errors.length() > 0) {
+                                            val details = (0 until errors.length()).joinToString("\n") { errors.optString(it) }
+                                            Toast.makeText(this, "Some filter lists could not be refreshed:\n$details", Toast.LENGTH_LONG).show()
+                                        } else if (stats?.optBoolean("lastUpdateComplete", false) == true) {
+                                            Toast.makeText(this, "EasyList and EasyPrivacy filters refreshed.", Toast.LENGTH_LONG).show()
+                                            current()?.session?.reload()
+                                        } else {
+                                            Toast.makeText(this, "Filter refresh status is unknown. Existing lists remain active.", Toast.LENGTH_LONG).show()
+                                        }
                                     }
                                 }
                             }
