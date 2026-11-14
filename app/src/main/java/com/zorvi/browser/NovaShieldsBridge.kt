@@ -6,9 +6,16 @@ import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.WebExtension
 
 /** Native UI bridge for the bundled EasyList/EasyPrivacy Shields extension. */
-internal class NovaShieldsBridge(private val runtime: GeckoRuntime) {
+internal class NovaShieldsBridge(private var runtime: GeckoRuntime) {
     @Volatile private var port: WebExtension.Port? = null
     @Volatile private var stateCallback: ((JSONObject) -> Unit)? = null
+
+    fun rebind(nextRuntime: GeckoRuntime, callback: (Boolean, String?) -> Unit) {
+        port = null
+        stateCallback = null
+        runtime = nextRuntime
+        install(callback)
+    }
 
     fun install(callback: (Boolean, String?) -> Unit) {
         runtime.webExtensionController.ensureBuiltIn(
