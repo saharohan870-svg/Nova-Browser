@@ -74,3 +74,16 @@ Nova Cloud Sync is intended to restore a signed-in user's browser snapshot on a 
 The synced browser data includes bookmarks, browsing history, recently closed tabs, open tabs (including tab groups, pinned state and Gecko session state where available), active tab, homepage, search engine, theme, reader and translation preferences, tracking protection, cookie policy, desktop mode and remembered site permissions. Guest and private browsing data, authentication tokens, Android DownloadManager IDs and device-specific downloaded-file URIs are excluded. Downloaded file contents remain on their original device.
 
 The public.nova_sync_state table is protected by row-level security and scoped to the authenticated Supabase user. The app uses the user's access token and the Supabase publishable key; the service-role key is never shipped in the app. The snapshot is not end-to-end encrypted in this implementation. Saved website passwords and portable website login/cookie sessions are not currently synchronized; those require a separate encrypted vault/profile-sync design and dedicated cross-device tests.
+
+
+### Password and website-session sync
+
+Nova uses GeckoView's native login storage/autocomplete delegates to detect submitted login forms, ask before saving, and offer stored credentials for autofill. Credentials are stored locally encrypted with an Android Keystore AES-GCM key. Private and Guest sessions do not save credentials.
+
+The Website Logins screen lists and removes saved website credentials. When the user unlocks the encrypted vault, newly saved logins are included in the encrypted cloud snapshot. The sync passphrase is required to decrypt that cloud backup on another device.
+
+The optional **Sessions** action uses a bundled, privileged GeckoView WebExtension and the WebExtensions cookies API. Session transfer is explicitly user-triggered, and exports only secure, non-partitioned cookies. The user must unlock the encrypted vault first. Private and Guest browsing are excluded. Cookie transfer can sign the user into websites on another device; only transfer to devices the user trusts. Some site sessions will still not transfer because websites may bind sessions to device, IP, browser state, or other server-side signals.
+
+This is not a raw Gecko profile copy. GeckoView does not provide a supported portable whole-profile export/import API. Cache, localStorage/IndexedDB, service-worker state, device-bound credentials, passkeys, TLS client certificates, downloads, and other profile internals are not migrated. Those require separate supported per-feature sync designs and cannot safely be copied as a profile folder between Android devices.
+
+These additions require a successful CI build and device testing before they should be treated as production-ready.
