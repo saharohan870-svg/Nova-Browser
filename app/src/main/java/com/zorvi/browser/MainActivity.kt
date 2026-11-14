@@ -1130,6 +1130,7 @@ class MainActivity : Activity() {
                 }
                 val mode = state.optString("mode", "standard")
                 val siteMode = state.optString("siteMode", "default")
+                val scriptsBlocked = state.optBoolean("scriptsBlocked", false)
                 val stats = state.optJSONObject("stats")
                 val blocked = stats?.optInt("blocked", 0) ?: 0
                 val network = stats?.optInt("networkRules", 0) ?: 0
@@ -1145,22 +1146,46 @@ class MainActivity : Activity() {
                     "\n\nBlocked requests this session: " + blocked +
                     "\nLoaded network rules: " + network + "\nCosmetic rules: " + cosmetic +
                     "\n\nNova Shields uses EasyList and EasyPrivacy filters, GeckoView tracking protection and cookie controls."
+                val httpsLabel = if (prefs.getBoolean("https_upgrade", true)) "HTTPS-first: On" else "HTTPS-first: Off"
+                val actions = arrayOf(
+                    "Global protection",
+                    "Protection for this site",
+                    if (scriptsBlocked) "Allow scripts on this site" else "Block scripts on this site",
+                    "Cookie policy",
+                    httpsLabel,
+                    "Update filter lists"
+                )
                 AlertDialog.Builder(this).setTitle("Nova Shields · " + siteLabel).setMessage(message)
-                    .setPositiveButton("Global protection") { _, _ -> chooseGlobalShieldMode(host, mode) }
-                    .setNeutralButton(if (host.isBlank()) "Site settings unavailable" else "This site") { _, _ ->
-                        if (host.isNotBlank()) chooseSiteShieldMode(host, siteMode)
-                    }
-                    .setNegativeButton("Update filters") { _, _ ->
-                        shieldsBridge.update(host) { updated, updateError ->
-                            runOnUiThread {
-                                if (updated == null) Toast.makeText(this, updateError ?: "Filter update failed.", Toast.LENGTH_LONG).show()
-                                else {
-                                    Toast.makeText(this, "EasyList and EasyPrivacy filters refreshed.", Toast.LENGTH_LONG).show()
-                                    current()?.session?.reload()
+                    .setItems(actions) { _, which ->
+                        when (which) {
+                            0 -> chooseGlobalShieldMode(host, mode)
+                            1 -> if (host.isNotBlank()) chooseSiteShieldMode(host, siteMode)
+                            2 -> if (host.isNotBlank()) shieldsBridge.setScripts(host, !scriptsBlocked) { result, scriptError ->
+                                runOnUiThread {
+                                    if (result == null) Toast.makeText(this, scriptError ?: "Could not update script blocking.", Toast.LENGTH_LONG).show()
+                                    else {
+                                        Toast.makeText(this, if (!scriptsBlocked) "Scripts blocked for this site." else "Scripts allowed for this site.", Toast.LENGTH_LONG).show()
+                                        current()?.session?.reload()
+                                    }
+                                }
+                            }
+                            3 -> chooseCookiePolicy()
+                            4 -> {
+                                val enabled = !prefs.getBoolean("https_upgrade", true)
+                                prefs.edit().putBoolean("https_upgrade", enabled).apply()
+                                Toast.makeText(this, if (enabled) "HTTPS-first enabled." else "HTTPS-first disabled.", Toast.LENGTH_SHORT).show()
+                            }
+                            5 -> shieldsBridge.update(host) { updated, updateError ->
+                                runOnUiThread {
+                                    if (updated == null) Toast.makeText(this, updateError ?: "Filter update failed.", Toast.LENGTH_LONG).show()
+                                    else {
+                                        Toast.makeText(this, "EasyList and EasyPrivacy filters refreshed.", Toast.LENGTH_LONG).show()
+                                        current()?.session?.reload()
+                                    }
                                 }
                             }
                         }
-                    }.show()
+                    }.setNegativeButton("Close", null).show()
             }
         }
     }
