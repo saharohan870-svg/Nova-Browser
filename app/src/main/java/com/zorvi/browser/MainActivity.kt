@@ -119,14 +119,20 @@ class MainActivity : Activity() {
         engine = Spinner(this).apply {
             adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, engines)
             setSelection(prefs.getInt("engine", 0).coerceIn(0, engines.lastIndex))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.rgb(35, 39, 47)); cornerRadius = 18f
+                setStroke(1, Color.rgb(83, 91, 105))
+            }
+            setPadding(8, 0, 8, 0)
             onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
                 override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
                     prefs.edit().putInt("engine", position).apply()
+                    (view as? TextView)?.setTextColor(Color.WHITE)
                 }
             }
         }
-        top.addView(engine, LinearLayout.LayoutParams(104, 48))
+        top.addView(engine, LinearLayout.LayoutParams(116, 48))
         address = EditText(this).apply {
             isSingleLine = true
             hint = "Search or enter address"
@@ -824,7 +830,7 @@ class MainActivity : Activity() {
         val saved = prefs.getString("home_page", null)
         // Migrate the previous built-in Google start page to the new Kali-themed start page.
         return if (saved.isNullOrBlank() || saved == "https://www.google.com") {
-            "file:///android_asset/home.html"
+            "file:///android_asset/home.html" + if (prefs.getBoolean("hide_home_shortcuts", false)) "?hideShortcuts=1" else ""
         } else saved
     }
 
@@ -844,6 +850,13 @@ class MainActivity : Activity() {
                     Toast.makeText(this, "Home page saved", Toast.LENGTH_SHORT).show()
                 } else Toast.makeText(this, "Enter a valid website address", Toast.LENGTH_SHORT).show()
             }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun toggleHomeShortcuts() {
+        val hide = !prefs.getBoolean("hide_home_shortcuts", false)
+        prefs.edit().putBoolean("hide_home_shortcuts", hide).apply()
+        Toast.makeText(this, if (hide) "Home shortcuts hidden" else "Home shortcuts visible", Toast.LENGTH_SHORT).show()
+        openHome()
     }
 
     private fun showDescribedOptions(
@@ -909,7 +922,8 @@ class MainActivity : Activity() {
             "Translate current page" to "Translate page content using the on-device translation service when available.",
             "Translation language" to "Choose the target language used by page translation.",
             "Reader view" to "Show a simplified, readable version of the current article.",
-            "Customize home page" to "Choose the website opened by Home and new tabs."
+            "Customize home page" to "Choose the website opened by Home and new tabs.",
+            "Show home shortcuts" to "Turn the Google, YouTube, Perplexity and GitHub shortcuts on or off."
         )
         showDescribedOptions("Nova tools", options) { which ->
             when (which) {
@@ -919,6 +933,7 @@ class MainActivity : Activity() {
                 3 -> chooseTranslationLanguage()
                 4 -> openReaderView()
                 5 -> customizeHomePage()
+                6 -> toggleHomeShortcuts()
             }
         }
     }
