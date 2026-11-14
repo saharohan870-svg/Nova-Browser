@@ -851,11 +851,20 @@ class MainActivity : Activity() {
         title: String,
         options: List<Pair<String, String>>,
         selectedIndex: Int = -1,
+        intro: String? = null,
         onSelect: (Int) -> Unit
     ) {
         val list = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 8, 20, 8)
+        }
+        if (!intro.isNullOrBlank()) {
+            list.addView(TextView(this).apply {
+                text = intro
+                textSize = 13f
+                setTextColor(Color.DKGRAY)
+                setPadding(8, 8, 8, 14)
+            })
         }
         val dialog = AlertDialog.Builder(this).setTitle(title).setView(ScrollView(this).apply {
             addView(list)
@@ -1203,18 +1212,17 @@ class MainActivity : Activity() {
                 val httpsLabel = if (prefs.getBoolean("https_upgrade", true)) "HTTPS-first: On" else "HTTPS-first: Off"
                 val fingerprintingLabel = if (prefs.getBoolean("fingerprinting_protection", true)) "Fingerprint protection: On" else "Fingerprint protection: Off"
                 val cleanupLabel = if (prefs.getBoolean("auto_clear_site_data", false)) "Clear site data on exit: On" else "Clear site data on exit: Off"
-                val actions = arrayOf(
-                    "Global protection",
-                    "Protection for this site",
-                    if (scriptsBlocked) "Allow scripts on this site" else "Block scripts on this site",
-                    "Cookie policy",
-                    httpsLabel,
-                    fingerprintingLabel,
-                    cleanupLabel,
-                    "Update filter lists"
+                val options = listOf(
+                    "Global protection" to "Choose Standard, Aggressive or Off for all websites.",
+                    "Protection for this site" to "Override the global Shields mode for the currently open website.",
+                    (if (scriptsBlocked) "Allow scripts on this site" else "Block scripts on this site") to "JavaScript blocking can improve privacy, but may break interactive features and sign-in pages.",
+                    "Cookie policy" to "Control whether sites can store cookies and how third-party cookies are isolated.",
+                    httpsLabel to "Try HTTPS when you enter an HTTP address. This typed-address upgrade does not guarantee every in-page link is upgraded.",
+                    fingerprintingLabel to "Reduce information websites can use to identify your device. Stronger protection can affect some site features.",
+                    cleanupLabel to "When enabled, Nova requests deletion of website storage when the app shuts down normally. This may sign you out; Android can skip shutdown callbacks.",
+                    "Update filter lists" to "Download the latest EasyList and EasyPrivacy rules. Requires an internet connection."
                 )
-                AlertDialog.Builder(this).setTitle("Nova Shields · " + siteLabel).setMessage(message)
-                    .setItems(actions) { _, which ->
+                showDescribedOptions("Nova Shields · " + siteLabel, options, intro = message) { which ->
                         when (which) {
                             0 -> chooseGlobalShieldMode(host, mode)
                             1 -> if (host.isNotBlank()) chooseSiteShieldMode(host, siteMode)
@@ -1255,7 +1263,7 @@ class MainActivity : Activity() {
                                 }
                             }
                         }
-                    }.setNegativeButton("Close", null).show()
+                }
             }
         }
     }
