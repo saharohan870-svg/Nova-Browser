@@ -204,7 +204,7 @@ class MainActivity : Activity() {
                     novaAuth.signOut {
                         runOnUiThread {
                             refreshAccountButton()
-                            vaultSyncPassphrase?.fill('\\u0000')
+                            vaultSyncPassphrase?.fill('\u0000')
                             vaultSyncPassphrase = null
                             Toast.makeText(this, "Signed out", Toast.LENGTH_SHORT).show()
                         }
