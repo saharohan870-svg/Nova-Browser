@@ -15,7 +15,7 @@ nativePort.onMessage.addListener(async message => {
     for (const cookie of message.cookies) {
       try {
         if (!cookie || !cookie.secure || !cookie.name || typeof cookie.value !== "string") { skipped++; continue; }
-        const host = String(cookie.domain || "").replace(/^\\./, "");
+        const host = String(cookie.domain || "").replace(/^\./, "");
         if (!host || !/^[a-z0-9.-]+$/i.test(host) || host.includes("..")) { skipped++; continue; }
         const url = "https://" + host + (cookie.path || "/");
         const details = {
