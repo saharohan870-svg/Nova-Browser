@@ -110,21 +110,72 @@ class MainActivity : Activity() {
         if (tabs.isEmpty()) newTab(homePage())
     }
 
+    private lateinit var contentFrame: FrameLayout
+
     private fun buildUi() {
-        root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val top = LinearLayout(this).apply {
+        val pageBg = Color.rgb(8, 10, 16)
+        val panel = Color.rgb(20, 23, 33)
+        val accent = Color.rgb(142, 92, 246)
+        val muted = Color.rgb(154, 160, 178)
+        fun rounded(color: Int, stroke: Int = Color.TRANSPARENT, radius: Float = 18f) =
+            android.graphics.drawable.GradientDrawable().apply {
+                setColor(color); cornerRadius = radius
+                if (stroke != Color.TRANSPARENT) setStroke(1, stroke)
+            }
+        fun navItem(label: String, symbol: String, action: () -> Unit): LinearLayout {
+            return LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                isClickable = true; isFocusable = true
+                setPadding(8, 7, 8, 7)
+                addView(TextView(this@MainActivity).apply {
+                    text = symbol; textSize = 20f; gravity = Gravity.CENTER
+                    setTextColor(Color.WHITE)
+                })
+                addView(TextView(this@MainActivity).apply {
+                    text = label; textSize = 10f; gravity = Gravity.CENTER
+                    setTextColor(muted)
+                })
+                setOnClickListener { action() }
+            }
+        }
+
+        root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(pageBg)
+        }
+
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(16, 12, 16, 10)
+            setBackgroundColor(pageBg)
+        }
+        val brandRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(6, 4, 6, 4)
+        }
+        brandRow.addView(TextView(this).apply {
+            text = "NOVA"; textSize = 20f; letterSpacing = .16f
+            setTextColor(Color.WHITE); setTypeface(null, android.graphics.Typeface.BOLD)
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        brandRow.addView(TextView(this).apply {
+            text = if (guestMode) "GUEST SESSION" else if (privateMode) "PRIVATE SESSION" else "BROWSER"
+            textSize = 10f; letterSpacing = .08f; setTextColor(accent)
+            setPadding(10, 6, 10, 6); background = rounded(panel, Color.rgb(55, 48, 78), 30f)
+        })
+        header.addView(brandRow)
+
+        val searchRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(7, 5, 7, 5)
+            background = rounded(panel, Color.rgb(48, 51, 66), 18f)
         }
         engine = Spinner(this).apply {
             adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, engines)
             setSelection(prefs.getInt("engine", 0).coerceIn(0, engines.lastIndex))
-            background = android.graphics.drawable.GradientDrawable().apply {
-                setColor(Color.rgb(35, 39, 47)); cornerRadius = 18f
-                setStroke(1, Color.rgb(83, 91, 105))
-            }
-            setPadding(8, 0, 8, 0)
+            background = rounded(Color.rgb(39, 34, 56), Color.rgb(83, 66, 117), 13f)
+            setPadding(5, 0, 5, 0)
             onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
                 override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
@@ -133,11 +184,14 @@ class MainActivity : Activity() {
                 }
             }
         }
-        top.addView(engine, LinearLayout.LayoutParams(116, 48))
+        searchRow.addView(engine, LinearLayout.LayoutParams(104, 44))
         address = EditText(this).apply {
             isSingleLine = true
             hint = "Search or enter address"
             textSize = 14f
+            setTextColor(Color.WHITE); setHintTextColor(muted)
+            setPadding(12, 0, 6, 0)
+            background = null
             imeOptions = EditorInfo.IME_ACTION_GO
             setSelectAllOnFocus(true)
             setOnEditorActionListener { _, action, _ ->
@@ -146,59 +200,82 @@ class MainActivity : Activity() {
                 } else false
             }
         }
-        top.addView(address, LinearLayout.LayoutParams(0, 48, 1f))
-        top.addView(button("＋") { pickSearchAttachment() }, LinearLayout.LayoutParams(42, 48))
-        top.addView(button("Go") { navigate(address.text.toString()) })
-        root.addView(top)
+        searchRow.addView(address, LinearLayout.LayoutParams(0, 46, 1f))
+        val attach = TextView(this).apply {
+            text = "＋"; textSize = 22f; gravity = Gravity.CENTER
+            setTextColor(Color.WHITE); isClickable = true; setPadding(5, 0, 5, 0)
+            setOnClickListener { pickSearchAttachment() }
+        }
+        searchRow.addView(attach, LinearLayout.LayoutParams(34, 44))
+        val go = TextView(this).apply {
+            text = "GO"; textSize = 12f; gravity = Gravity.CENTER
+            setTextColor(Color.WHITE); setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(13, 0, 13, 0); background = rounded(accent, radius = 13f)
+            isClickable = true; setOnClickListener { navigate(address.text.toString()) }
+        }
+        searchRow.addView(go, LinearLayout.LayoutParams(-2, 40))
+        val searchParams = LinearLayout.LayoutParams(-1, -2)
+        searchParams.topMargin = 12
+        header.addView(searchRow, searchParams)
+        root.addView(header)
 
-        val controls = LinearLayout(this).apply {
+        contentFrame = FrameLayout(this).apply {
+            setBackgroundColor(pageBg)
+        }
+        root.addView(contentFrame, LinearLayout.LayoutParams(-1, 0, 1f))
+
+        val bottom = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
+            setPadding(4, 4, 4, 5)
+            background = rounded(Color.rgb(16, 18, 27), Color.rgb(39, 42, 56), 18f)
         }
-        controls.addView(button("＋") { newTab(homePage()) })
-        controls.addView(button("←") { current()?.session?.goBack() })
-        controls.addView(button("→") { current()?.session?.goForward() })
-        controls.addView(button("↻") { current()?.session?.reload() })
-        controls.addView(button("★") { bookmark() })
-        controls.addView(button("Bookmarks") { showSavedList(false) })
-        controls.addView(button("History") { showSavedList(true) })
-        controls.addView(button("Passwords") { showPasswordVault() })
-        controls.addView(button("Website Logins") { showSavedWebsiteLogins() })
-        controls.addView(button("Sessions") { showWebsiteSessionSync() })
-        tabsLabel = TextView(this).apply {
-            text = "Tabs 0"; gravity = Gravity.CENTER; setPadding(7, 12, 7, 12)
-            setOnClickListener { showTabs() }
-        }
-        controls.addView(tabsLabel)
-        controls.addView(button(accountButtonLabel()) { showAccount() })
-        controls.addView(button("AI Sites") { showCompatibilitySites(true) })
-        controls.addView(button("Sites") { showCompatibilitySites(false) })
-        controls.addView(button("Desktop") { toggleDesktopMode() })
-        controls.addView(button("Home") { openHome() })
-        controls.addView(button("Settings") { showSettings() })
-        controls.addView(button("Tools") { showAdvancedTools() })
-        controls.addView(button("🛡 Shields") { showBraveShields() })
-        controls.addView(button("Permissions") { showPermissionDashboard() })
-        controls.addView(button("Blocklist") { manageBlockedDomains() })
-        controls.addView(button("Group") { manageGroups() })
-        controls.addView(button("Downloads") { showDownloads() })
-        controls.addView(button("PiP") { enterPip() })
-        controls.addView(button("VPN") { showVpnStatus() })
-        controls.addView(button("Private") { togglePrivate() })
-        controls.addView(button(if (guestMode) "End Guest" else "Guest Mode") { if (guestMode) endGuestMode() else startGuestMode() })
-        controls.addView(button("☾") {
-            dark = !dark
-            prefs.edit().putBoolean("dark_mode", dark).apply()
-            applyTheme()
-        })
-        root.addView(HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            addView(controls)
-        })
+        bottom.addView(navItem("Home", "⌂") { openHome() }, LinearLayout.LayoutParams(0, 58, 1f))
+        bottom.addView(navItem("Back", "‹") { current()?.session?.goBack() }, LinearLayout.LayoutParams(0, 58, 1f))
+        bottom.addView(navItem("Tabs", "▢") { showTabs() }, LinearLayout.LayoutParams(0, 58, 1f))
+        bottom.addView(navItem("Bookmarks", "☆") { showSavedList(false) }, LinearLayout.LayoutParams(0, 58, 1f))
+        bottom.addView(navItem("Menu", "⋯") { showBrowserMenu() }, LinearLayout.LayoutParams(0, 58, 1f))
+        val bottomParams = LinearLayout.LayoutParams(-1, -2)
+        bottomParams.setMargins(10, 0, 10, 8)
+        root.addView(bottom, bottomParams)
+
+        tabsLabel = TextView(this).apply { text = "Tabs 0"; visibility = View.GONE }
         setContentView(root)
         applyTheme()
     }
 
+    private fun showBrowserMenu() {
+        val options = arrayOf(
+            "New tab", "Private browsing", if (guestMode) "End Guest Mode" else "Guest Mode",
+            "History", "Downloads", "AI assistant and tools", "Shields and tracker protection",
+            "Tab groups", "Account and sync", "Password vault", "Website logins",
+            "Permissions", "VPN", "Desktop site", "Settings", "Dark mode"
+        )
+        AlertDialog.Builder(this).setTitle("Nova menu").setItems(options) { _, which ->
+            when (which) {
+                0 -> newTab(homePage())
+                1 -> togglePrivate()
+                2 -> if (guestMode) endGuestMode() else startGuestMode()
+                3 -> showSavedList(true)
+                4 -> showDownloads()
+                5 -> showAdvancedTools()
+                6 -> showBraveShields()
+                7 -> manageGroups()
+                8 -> showAccount()
+                9 -> showPasswordVault()
+                10 -> showSavedWebsiteLogins()
+                11 -> showPermissionDashboard()
+                12 -> showVpnStatus()
+                13 -> toggleDesktopMode()
+                14 -> showSettings()
+                15 -> {
+                    dark = !dark
+                    prefs.edit().putBoolean("dark_mode", dark).apply()
+                    applyTheme()
+                }
+            }
+        }.setNegativeButton("Close", null).show()
+    }
 
     private fun accountButtonLabel(): String =
         if (novaAuth.currentEmail() == null) "Account" else "Account ✓"
@@ -1658,20 +1735,23 @@ class MainActivity : Activity() {
         tabs.add(tab)
         active = tabs.lastIndex
         saveTabs()
-        root.addView(view, LinearLayout.LayoutParams(-1, 0, 1f))
         showOnlyActive()
         updateTabs()
     }
 
     private fun showOnlyActive() {
-        if (root.childCount > 2) root.removeViews(2, root.childCount - 2)
+        contentFrame.removeAllViews()
         tabs.forEachIndexed { index, tab ->
             tab.view.visibility = if (index == active) View.VISIBLE else View.GONE
-            if (tab.view.parent == null) root.addView(tab.view, LinearLayout.LayoutParams(-1, 0, 1f))
             tab.session.setActive(index == active)
             tab.session.setFocused(index == active)
         }
-        address.setText(current()?.url.orEmpty())
+        current()?.let { tab ->
+            (tab.view.parent as? android.view.ViewGroup)?.removeView(tab.view)
+            contentFrame.addView(tab.view, FrameLayout.LayoutParams(-1, -1))
+            address.setText(tab.url)
+        } ?: address.setText("")
+        updateTabs()
     }
 
     private fun navigate(input: String) {
