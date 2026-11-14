@@ -19,7 +19,8 @@
     "http://*/*",
     "https://*/*",
     "https://easylist.to/*",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "nativeMessaging"
   ],
   "background": {
     "scripts": [
