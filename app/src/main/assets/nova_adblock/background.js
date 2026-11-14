@@ -5,7 +5,7 @@ const LISTS=[
 ];
 const UPDATE_MS=86400000;
 let compiled=NovaAdblockEngine.compile([]),mode="standard",siteOverrides={},scriptOverrides={},firstParty=new Map(),nativePort=null;
-let stats={blocked:0,updatedAt:0,networkRules:0,cosmeticRules:0};
+let stats={blocked:0,updatedAt:0,networkRules:0,cosmeticRules:0,updateErrors:[],lastUpdateComplete:false};
 function state(host){return {type:"shieldState",host:host||"",enabled:mode!=="off",mode,siteMode:siteOverrides[host||""]||"default",scriptsBlocked:!!scriptOverrides[host||""],stats:{...stats}};}
 async function rebuild(){
  const saved=await browser.storage.local.get(["filter_easylist","filter_easyprivacy","mode","enabled","siteOverrides","scriptOverrides","stats"]);
@@ -19,6 +19,7 @@ async function rebuild(){
  stats.networkRules=compiled.network;stats.cosmeticRules=compiled.cosmetic;
 }
 async function updateLists(force){
+ stats.updateErrors=[];
  const keys=LISTS.flatMap(x=>["filter_"+x.key,"updated_"+x.key]);
  const saved=await browser.storage.local.get(keys);
  for(const list of LISTS){
@@ -32,10 +33,15 @@ async function updateLists(force){
    const lines=body.split(/\r?\n/);
    await browser.storage.local.set({[key]:lines,["updated_"+list.key]:Date.now()});
    console.log("[NovaShields] updated",list.name,lines.length,"lines");
-  }catch(error){console.warn("[NovaShields] update failed for",list.name,error.message);}
+  }catch(error){
+   const message=list.name+": "+String(error&&error.message||error);
+   stats.updateErrors.push(message);
+   console.warn("[NovaShields] update failed for",list.name,error.message);
+  }
  }
  await rebuild();
- stats.updatedAt=Date.now();
+ stats.lastUpdateComplete=stats.updateErrors.length===0;
+ if(stats.lastUpdateComplete)stats.updatedAt=Date.now();
  await browser.storage.local.set({stats});
 }
 browser.webRequest.onBeforeRequest.addListener(details=>{
