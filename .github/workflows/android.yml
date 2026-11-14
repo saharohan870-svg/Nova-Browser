@@ -34,10 +34,16 @@ jobs:
           packages: platform-tools
       - name: Install required Android SDK packages
         run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;36.0.0"
-      - name: Test Nova ad blocker filter engine
-        run: node tests/adblock-engine.test.cjs
-      - name: Run Nova browser unit tests
-        run: gradle testDebugUnitTest --stacktrace
+      - name: Run repeated Nova regression checks (20 passes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pass in $(seq 1 20); do
+            echo "===== Regression pass $pass/20: ad blocker ====="
+            node tests/adblock-engine.test.cjs
+            echo "===== Regression pass $pass/20: Android unit tests ====="
+            gradle testDebugUnitTest --stacktrace
+          done
       - name: Compile debug APK
         run: gradle assembleDebug --stacktrace
       - name: Check APK download size
