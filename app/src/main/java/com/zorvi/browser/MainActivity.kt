@@ -143,6 +143,7 @@ class MainActivity : Activity() {
         controls.addView(button("Bookmarks") { showSavedList(false) })
         controls.addView(button("History") { showSavedList(true) })
         controls.addView(button("Passwords") { showPasswordVault() })
+        controls.addView(button("Website Logins") { showSavedWebsiteLogins() })
         tabsLabel = TextView(this).apply {
             text = "Tabs 0"; gravity = Gravity.CENTER; setPadding(7, 12, 7, 12)
             setOnClickListener { showTabs() }
@@ -228,6 +229,37 @@ class MainActivity : Activity() {
                 }
             }
         })
+    }
+
+    private fun showSavedWebsiteLogins() {
+        if (guestMode || current()?.guest == true || novaAuth.currentEmail() == null) {
+            Toast.makeText(this, "Sign in and leave Guest Mode to manage saved logins.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val logins = loginStore.fetch()
+        if (logins.isEmpty()) {
+            Toast.makeText(this, "No website passwords saved yet. Sign in to a website and accept Nova's save prompt.", Toast.LENGTH_LONG).show()
+            return
+        }
+        val labels = logins.map { "\${it.origin} — \${it.username}" }.toTypedArray()
+        AlertDialog.Builder(this).setTitle("Saved website logins")
+            .setItems(labels) { _, index ->
+                val login = logins[index]
+                AlertDialog.Builder(this).setTitle(login.origin)
+                    .setMessage("Username: \${login.username}\nPassword: ••••••••")
+                    .setPositiveButton("Copy password") { _, _ ->
+                        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Nova password", login.password))
+                        Toast.makeText(this, "Password copied to clipboard.", Toast.LENGTH_LONG).show()
+                    }
+                    .setNeutralButton("Delete") { _, _ ->
+                        login.guid?.let { loginStore.remove(it) }
+                        syncWebsiteLogins()
+                        Toast.makeText(this, "Saved login deleted.", Toast.LENGTH_SHORT).show()
+                    }
+                    .setNegativeButton("Close", null).show()
+            }
+            .setNegativeButton("Close", null).show()
     }
 
     private fun showPasswordVault() {
