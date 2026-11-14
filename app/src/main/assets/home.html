@@ -4,57 +4,63 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#080a12">
 <title>Nova Browser</title>
 <style>
-:root{color-scheme:dark;font-family:Inter,Roboto,"Segoe UI",sans-serif}
+:root{color-scheme:dark;font-family:Inter,Roboto,"Segoe UI",sans-serif;background:#080a12;color:#f7f7fb}
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:#050608;color:#f5f5f7}
-body{min-height:100vh;display:grid;place-items:center;overflow-x:hidden}
-.wallpaper{position:fixed;inset:0;background-color:#050608;background-image:linear-gradient(90deg,rgba(0,0,0,.68),rgba(0,0,0,.28) 55%,rgba(0,0,0,.68)),linear-gradient(0deg,rgba(0,0,0,.72),transparent 65%),url("https://www.kali.org/images/kali-dragon-icon.svg");background-size:min(78vw,620px);background-position:center 44%;background-repeat:no-repeat;filter:brightness(.82);z-index:0}
-main{position:relative;z-index:1;width:min(680px,92vw);padding:32px 20px;text-align:center;margin:auto}
-.brand{font-size:clamp(32px,8vw,54px);font-weight:750;letter-spacing:-2px;margin:0 0 8px;text-shadow:0 3px 22px #000}
-.sub{margin:0 0 30px;color:#d4d4d8;font-size:14px;text-shadow:0 2px 10px #000}
-.search{display:flex;align-items:center;gap:7px;padding:7px;background:rgba(15,17,21,.88);border:1px solid rgba(255,255,255,.17);border-radius:18px;box-shadow:0 12px 38px #0008;backdrop-filter:blur(14px)}
-.engine{max-width:124px;min-width:0;border:1px solid #ffffff20;border-radius:12px;background:#242830;color:#fff;padding:10px 8px;font-size:12px;outline:none}
-.engine:focus{border-color:#58a6e7}
-@media(max-width:420px){.search{gap:5px;padding:6px}.engine{max-width:104px;padding:10px 5px;font-size:11px}input{padding:11px 7px;font-size:14px}button{padding:0 12px}}
-input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:#fff;padding:12px 14px;font-size:16px}
-button{border:0;border-radius:13px;padding:0 19px;background:#1769aa;color:#fff;font-weight:650;font-size:14px}
-.shortcuts{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin-top:25px}
-a{color:#fff;text-decoration:none}
-.shortcut{min-width:88px;padding:13px 15px;border:1px solid #ffffff24;border-radius:14px;background:#101318b8;backdrop-filter:blur(12px);font-size:13px}
-.shortcut:active,button:active{transform:scale(.97)}
-.shortcuts[hidden]{display:none!important}
-.footer{margin-top:30px;color:#c5c5cb;font-size:11px;text-shadow:0 2px 8px #000}
-@media(prefers-reduced-motion:no-preference){.wallpaper{animation:fadein .8s ease-out}@keyframes fadein{from{opacity:.4}to{opacity:1}}}
+html,body{margin:0;min-height:100%;background:#080a12}
+body{min-height:100vh;overflow-x:hidden;background:radial-gradient(ellipse at 50% 12%,#302052 0,rgba(48,32,82,.22) 32%,transparent 62%),radial-gradient(ellipse at 4% 82%,#14243c 0,transparent 42%),#080a12}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.16;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:34px 34px;mask-image:linear-gradient(to bottom,black,transparent 88%)}
+main{position:relative;width:min(760px,100%);margin:0 auto;padding:34px 22px 38px}
+.brand{display:flex;align-items:center;gap:12px;margin:0 0 54px}
+.mark{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(145deg,#a78bfa,#6335c8);box-shadow:0 8px 30px #7045c855;font-weight:900;font-size:24px;color:white}
+.brand-name{font-size:18px;letter-spacing:.18em;font-weight:800}
+.edition{margin-left:auto;border:1px solid #a78bfa55;color:#c4b5fd;border-radius:99px;padding:7px 10px;font-size:9px;letter-spacing:.12em}
+.hero{text-align:center;margin:0 auto 28px;max-width:600px}
+.eyebrow{color:#b9a5fa;font-size:10px;letter-spacing:.24em;font-weight:750;margin:0 0 16px}
+h1{font-size:clamp(38px,9vw,64px);line-height:1.02;letter-spacing:-.055em;margin:0;font-weight:800}
+h1 span{background:linear-gradient(100deg,#fff 15%,#c4b5fd 60%,#8b5cf6);background-clip:text;-webkit-background-clip:text;color:transparent}
+.sub{font-size:14px;line-height:1.65;color:#a7a8b8;margin:17px auto 0;max-width:390px}
+.search{display:flex;gap:8px;max-width:620px;margin:0 auto;padding:7px;border-radius:19px;background:#171925;border:1px solid #ffffff20;box-shadow:0 18px 55px #0008}
+.search input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:#fff;padding:13px 12px;font-size:14px}
+.search input::placeholder{color:#777b8d}
+.search button{border:0;border-radius:13px;background:linear-gradient(135deg,#986cf6,#6638c8);color:white;font-weight:750;padding:0 20px}
+.section{display:flex;align-items:center;justify-content:space-between;margin:34px 2px 13px}
+.section strong{font-size:12px;letter-spacing:.1em;color:#e4e2ee}
+.section small{font-size:10px;color:#777b8d}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.tile{min-height:86px;border:1px solid #ffffff14;border-radius:17px;background:linear-gradient(145deg,#191c2a,#11131d);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;color:#e8e7ef;text-decoration:none;font-size:11px;font-weight:600}
+.tile:active{transform:scale(.97)}
+.tile i{font-style:normal;font-size:19px;color:#c4b5fd}
+.bottom{margin-top:34px;border-top:1px solid #ffffff12;padding-top:18px;display:flex;justify-content:space-between;gap:12px;color:#6f7282;font-size:10px}
+@media(max-width:420px){main{padding:26px 16px 28px}.brand{margin-bottom:46px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.tile{min-height:72px}.edition{font-size:8px}}
 </style>
 </head>
 <body>
-<div class="wallpaper" aria-hidden="true"></div>
 <main>
-<h1 class="brand">Nova Browser</h1>
-<p class="sub">A faster way to explore.</p>
-<form class="search" id="searchForm">
-<input id="query" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search the web or enter an address" aria-label="Search the web">
-<button type="submit">Search</button>
-</form>
-<nav class="shortcuts" id="shortcuts" aria-label="Quick links">
-<a class="shortcut" href="https://www.google.com">Google</a>
-<a class="shortcut" href="https://www.youtube.com">YouTube</a>
-<a class="shortcut" href="https://www.perplexity.ai">Perplexity</a>
-<a class="shortcut" href="https://github.com">GitHub</a>
+<header class="brand"><div class="mark">N</div><div class="brand-name">NOVA</div><div class="edition">KALI DRAGON EDITION</div></header>
+<section class="hero"><p class="eyebrow">A NEW WAY TO EXPLORE</p><h1>Your web.<br><span>Your space.</span></h1><p class="sub">A focused browsing experience with privacy tools, useful shortcuts and room to explore.</p></section>
+<form class="search" id="searchForm"><input id="query" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search anything or enter a website" aria-label="Search the web"><button type="submit">Search ↗</button></form>
+<div class="section"><strong>QUICK ACCESS</strong><small>Your favourite places</small></div>
+<nav class="grid" id="shortcuts" aria-label="Quick links">
+<a class="tile" href="https://www.google.com"><i>G</i>Google</a>
+<a class="tile" href="https://www.youtube.com"><i>▶</i>YouTube</a>
+<a class="tile" href="https://github.com"><i>⌘</i>GitHub</a>
+<a class="tile" href="https://www.perplexity.ai"><i>✦</i>Perplexity</a>
+<a class="tile" href="https://chatgpt.com"><i>✳</i>ChatGPT</a>
+<a class="tile" href="https://claude.ai"><i>◈</i>Claude</a>
+<a class="tile" href="https://www.instagram.com"><i>◎</i>Instagram</a>
+<a class="tile" href="https://discord.com/app"><i>◉</i>Discord</a>
 </nav>
-<p class="footer">Your browsing stays on your device unless you choose to use an online service.</p>
+<footer class="bottom"><span>NOVA BROWSER</span><span>Explore with confidence.</span></footer>
 </main>
 <script>
 if(new URLSearchParams(location.search).get("hideShortcuts")==="1")document.getElementById("shortcuts").hidden=true;
 document.getElementById("searchForm").addEventListener("submit",function(event){
- event.preventDefault();
- const value=document.getElementById("query").value.trim();
- if(!value)return;
+ event.preventDefault();const value=document.getElementById("query").value.trim();if(!value)return;
  const looksLikeUrl=/^(https?:\/\/)/i.test(value)||(/^[^\s.]+\.[^\s]+$/.test(value)&&!value.includes(" "));
  window.location.href=looksLikeUrl?(value.match(/^https?:\/\//i)?value:"https://"+value):"https://www.google.com/search?q="+encodeURIComponent(value);
 });
 </script>
-</body>
-</html>
+</body></html>
