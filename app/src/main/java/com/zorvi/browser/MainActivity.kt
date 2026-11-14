@@ -81,6 +81,7 @@ class MainActivity : Activity() {
     private val cloudSync by lazy { NovaCloudSync(prefs, novaAuth) }
     private val encryptedVaultSync by lazy { NovaEncryptedVaultSync(novaAuth) }
     private val loginStore by lazy { NovaLoginStore(applicationContext) }
+    @Volatile private var vaultSyncPassphrase: CharArray? = null
     private val engines = listOf("Google", "Bing", "DuckDuckGo", "Brave Search")
     private val torController by lazy { NovaTorController(applicationContext) }
     private val runtime: GeckoRuntime get() = getOrCreateRuntime(applicationContext)
@@ -221,7 +222,10 @@ class MainActivity : Activity() {
             }
             override fun onLoginSave(login: org.mozilla.geckoview.Autocomplete.LoginEntry) {
                 val origin = runCatching { Uri.parse(login.origin) }.getOrNull()
-                if (origin?.scheme == "https" && !guestMode && !privateMode) loginStore.save(login)
+                if (origin?.scheme == "https" && !guestMode && !privateMode) {
+                    loginStore.save(login)
+                    syncWebsiteLogins()
+                }
             }
         })
     }
@@ -270,6 +274,9 @@ class MainActivity : Activity() {
                             try {
                                 val localEnvelope = NovaVaultCrypto.encrypt(json, localPassphrase)
                                 prefs.edit().putString(vaultLocalStorageKey(), localEnvelope.toString()).apply()
+                                loginStore.importFromEncryptedSync(json)
+                                vaultSyncPassphrase?.fill('\u0000')
+                                vaultSyncPassphrase = localPassphrase.copyOf()
                                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                                 showVaultEntries(json, localPassphrase.copyOf())
                             } catch (error: Exception) {
@@ -282,10 +289,15 @@ class MainActivity : Activity() {
                 } else {
                     val local = prefs.getString(vaultLocalStorageKey(), null)
                     if (local.isNullOrBlank()) {
+                        vaultSyncPassphrase?.fill('\u0000')
+                        vaultSyncPassphrase = passphrase.copyOf()
                         showVaultEntries("{\"entries\":[]}", passphrase)
                     } else {
                         try {
                             val json = NovaVaultCrypto.decrypt(org.json.JSONObject(local), passphrase)
+                            loginStore.importFromEncryptedSync(json)
+                            vaultSyncPassphrase?.fill('\u0000')
+                            vaultSyncPassphrase = passphrase.copyOf()
                             showVaultEntries(json, passphrase.copyOf())
                             passphrase.fill('\u0000')
                         } catch (error: Exception) {
@@ -368,12 +380,17 @@ class MainActivity : Activity() {
     }
 
     private fun saveVaultAndSync(entries: JSONArray, passphrase: CharArray) {
-        val json = org.json.JSONObject().put("entries", entries).toString()
+        val json = org.json.JSONObject()
+            .put("entries", entries)
+            .put("websiteLogins", loginStore.exportEntriesForEncryptedSync())
+            .toString()
         val localPassphrase = passphrase.copyOf()
         val cloudPassphrase = passphrase.copyOf()
         try {
             val localEnvelope = NovaVaultCrypto.encrypt(json, localPassphrase)
             prefs.edit().putString(vaultLocalStorageKey(), localEnvelope.toString()).apply()
+            vaultSyncPassphrase?.fill('\u0000')
+            vaultSyncPassphrase = passphrase.copyOf()
             encryptedVaultSync.backup(json, cloudPassphrase) { _, message ->
                 Toast.makeText(this, message, Toast.LENGTH_LONG).show()
             }
@@ -385,6 +402,30 @@ class MainActivity : Activity() {
             passphrase.fill('\u0000')
         }
     }
+
+    private fun syncWebsiteLogins() {
+        val passphrase = vaultSyncPassphrase?.copyOf() ?: return
+        try {
+            val local = prefs.getString(vaultLocalStorageKey(), null)
+            val root = if (local.isNullOrBlank()) org.json.JSONObject()
+                else NovaVaultCrypto.decrypt(org.json.JSONObject(local), passphrase).let { org.json.JSONObject(it) }
+            if (!root.has("entries")) root.put("entries", JSONArray())
+            root.put("websiteLogins", loginStore.exportEntriesForEncryptedSync())
+            val json = root.toString()
+            val envelope = NovaVaultCrypto.encrypt(json, passphrase)
+            prefs.edit().putString(vaultLocalStorageKey(), envelope.toString()).apply()
+            encryptedVaultSync.backup(json, passphrase.copyOf()) { _, message ->
+                if (!message.startsWith("Encrypted vault backup updated")) {
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                }
+            }
+        } catch (error: Exception) {
+            Toast.makeText(this, error.message ?: "Could not sync saved website passwords.", Toast.LENGTH_LONG).show()
+        } finally {
+            passphrase.fill('\u0000')
+        }
+    }
+
 
     private fun syncCloud(showMessage: Boolean) {
         if (guestMode || novaAuth.currentEmail() == null) return
