@@ -20,10 +20,16 @@ internal class NovaLoginStore(context: Context) {
     private val alias = "nova.login.store.v1"
     private val lock = Any()
 
-    fun fetch(origin: String? = null): Array<Autocomplete.LoginEntry> = synchronized(lock) {
+    fun fetch(domain: String? = null): Array<Autocomplete.LoginEntry> = synchronized(lock) {
         val entries = read()
-        entries.filter { origin == null || it.optString("origin") == origin }
-            .map { toEntry(it) }.toTypedArray()
+        entries.filter {
+            if (domain == null) true
+            else {
+                val host = runCatching { java.net.URI(it.optString("origin")).host }.getOrNull()
+                host.equals(domain, ignoreCase = true) ||
+                    it.optString("origin").equals(domain, ignoreCase = true)
+            }
+        }.map { toEntry(it) }.toTypedArray()
     }
 
     fun save(login: Autocomplete.LoginEntry) = synchronized(lock) {
@@ -61,18 +67,20 @@ internal class NovaLoginStore(context: Context) {
         write(updated)
     }
 
-    fun exportForEncryptedSync(): String = synchronized(lock) {
-        JSONObject().put("entries", read()).toString()
+    fun exportEntriesForEncryptedSync(): JSONArray = synchronized(lock) {
+        JSONArray(read().toString())
     }
 
     fun importFromEncryptedSync(json: String) = synchronized(lock) {
-        val incoming = JSONObject(json).optJSONArray("entries") ?: JSONArray()
+        val root = JSONObject(json)
+        val incoming = root.optJSONArray("websiteLogins")
+            ?: root.optJSONArray("entries") ?: JSONArray()
         val validated = JSONArray()
         for (i in 0 until incoming.length()) {
             val item = incoming.optJSONObject(i) ?: continue
-            val origin = item.optString("origin")
+            val origin = item.optString("origin").ifBlank { item.optString("site") }
             if (!origin.startsWith("https://") || item.optString("password").isBlank()) continue
-            validated.put(JSONObject(item.toString()))
+            validated.put(JSONObject(item.toString()).put("origin", origin))
         }
         write(validated)
     }
