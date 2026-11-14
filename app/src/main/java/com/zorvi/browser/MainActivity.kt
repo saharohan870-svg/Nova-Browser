@@ -1564,6 +1564,7 @@ class MainActivity : Activity() {
         val scheme = uri?.scheme?.lowercase(Locale.ROOT)
         val hasScheme = scheme != null && scheme.matches(Regex("^[a-z][a-z0-9+.-]*$"))
         val target = when {
+            hasScheme && scheme == "http" && prefs.getBoolean("https_upgrade", true) -> value.replaceFirst("http://", "https://", ignoreCase = true)
             hasScheme && (scheme == "http" || scheme == "https") -> value
             hasScheme && current()?.guest == true -> {
                 Toast.makeText(this, "External app links are disabled in Guest Mode.", Toast.LENGTH_SHORT).show()
