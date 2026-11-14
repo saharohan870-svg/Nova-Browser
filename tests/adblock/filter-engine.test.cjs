@@ -11,7 +11,7 @@ test("blocks a third-party script by host-anchored rule",()=>{
 });
 test("does not block first-party request with third-party option",()=>{
  const c=Engine.compile(["||cdn.publisher.com^$script,third-party"]);
- assert.equal(Engine.decide(c,req("https://cdn.publisher.com/app.js"),"publisher.com"),false);
+ assert.equal(Engine.decide(c,req("https://cdn.publisher.com/app.js"),"cdn.publisher.com"),false);
 });
 test("respects resource type options",()=>{
  const c=Engine.compile(["||ads.example^$image"]);
@@ -44,12 +44,17 @@ test("unsupported procedural or redirect options are ignored safely",()=>{
 
 test("aggressive mode also evaluates first-party filter rules",()=>{
  const c=Engine.compile(["||cdn.publisher.com^$script,third-party"]);
- assert.equal(Engine.decide(c,req("https://cdn.publisher.com/app.js"),"publisher.com"),false);
- assert.equal(Engine.decide(c,req("https://cdn.publisher.com/app.js"),"publisher.com",true),true);
+ assert.equal(Engine.decide(c,req("https://cdn.publisher.com/app.js"),"cdn.publisher.com"),false);
+ assert.equal(Engine.decide(c,req("https://cdn.publisher.com/app.js"),"cdn.publisher.com",true),true);
 });
 
 test("standard mode treats unqualified network rules as third-party by default",()=>{
  const c=Engine.compile(["||cdn.publisher.com^"]);
- assert.equal(Engine.decide(c,req("https://cdn.publisher.com/app.js"),"publisher.com"),false);
- assert.equal(Engine.decide(c,req("https://cdn.publisher.com/app.js"),"publisher.com",true),true);
+ assert.equal(Engine.decide(c,req("https://cdn.publisher.com/app.js"),"cdn.publisher.com"),false);
+ assert.equal(Engine.decide(c,req("https://cdn.publisher.com/app.js"),"cdn.publisher.com",true),true);
+});
+
+test("conservative host matching treats sibling subdomains as third-party",()=>{
+ const c=Engine.compile(["||cdn.publisher.com^$script,third-party"]);
+ assert.equal(Engine.decide(c,req("https://cdn.publisher.com/app.js"),"publisher.com"),true);
 });
