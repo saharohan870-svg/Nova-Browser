@@ -91,6 +91,7 @@ class MainActivity : Activity() {
         return loginStoreInstance!!
     }
     private val cookieSyncBridge by lazy { NovaCookieSyncBridge(runtime) }
+    private val shieldsBridge by lazy { NovaShieldsBridge(runtime) }
     @Volatile private var vaultSyncPassphrase: CharArray? = null
     private val engines = listOf("Google", "Bing", "DuckDuckGo", "Brave Search")
     private val torController by lazy { NovaTorController(applicationContext) }
@@ -104,6 +105,7 @@ class MainActivity : Activity() {
         applyCookiePolicy()
         configureLoginStorage()
         cookieSyncBridge.install { ok, error -> if (!ok) android.util.Log.e("NovaCookieSync", error ?: "Extension setup failed") }
+        shieldsBridge.install { ok, error -> if (!ok) android.util.Log.e("NovaShields", error ?: "Extension setup failed") }
         restoreTabs()
         if (tabs.isEmpty()) newTab(homePage())
     }
@@ -167,7 +169,7 @@ class MainActivity : Activity() {
         controls.addView(button("Desktop") { toggleDesktopMode() })
         controls.addView(button("Home") { openHome() })
         controls.addView(button("Tools") { showAdvancedTools() })
-        controls.addView(button("Shield") { showPrivacyControls() })
+        controls.addView(button("🛡 Shields") { showBraveShields() })
         controls.addView(button("Permissions") { showPermissionDashboard() })
         controls.addView(button("Blocklist") { manageBlockedDomains() })
         controls.addView(button("Group") { manageGroups() })
@@ -1109,6 +1111,104 @@ class MainActivity : Activity() {
                 entries.forEach { edit.remove(it.key) }
                 edit.apply()
             }.setNegativeButton("Close", null).show()
+    }
+
+    private fun currentShieldHost(): String {
+        val url = current()?.url.orEmpty()
+        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return ""
+        if (uri.scheme != "http" && uri.scheme != "https") return ""
+        return uri.host?.lowercase(Locale.ROOT).orEmpty()
+    }
+
+    private fun showBraveShields() {
+        val host = currentShieldHost()
+        shieldsBridge.get(host) { state, error ->
+            runOnUiThread {
+                if (state == null) {
+                    Toast.makeText(this, error ?: "Could not read Shields status.", Toast.LENGTH_LONG).show()
+                    return@runOnUiThread
+                }
+                val mode = state.optString("mode", "standard")
+                val siteMode = state.optString("siteMode", "default")
+                val stats = state.optJSONObject("stats")
+                val blocked = stats?.optInt("blocked", 0) ?: 0
+                val network = stats?.optInt("networkRules", 0) ?: 0
+                val cosmetic = stats?.optInt("cosmeticRules", 0) ?: 0
+                val siteLabel = if (host.isBlank()) "No website is active" else host
+                val siteProtection = when (siteMode) {
+                    "off" -> "Off for this site"
+                    "aggressive" -> "Aggressive for this site"
+                    else -> "Using global setting"
+                }
+                val message = "Global protection: " + mode.replaceFirstChar { it.uppercase() } +
+                    "\nThis site: " + siteProtection +
+                    "\n\nBlocked requests this session: " + blocked +
+                    "\nLoaded network rules: " + network + "\nCosmetic rules: " + cosmetic +
+                    "\n\nNova Shields uses EasyList and EasyPrivacy filters, GeckoView tracking protection and cookie controls."
+                AlertDialog.Builder(this).setTitle("Nova Shields · " + siteLabel).setMessage(message)
+                    .setPositiveButton("Global protection") { _, _ -> chooseGlobalShieldMode(host, mode) }
+                    .setNeutralButton(if (host.isBlank()) "Site settings unavailable" else "This site") { _, _ ->
+                        if (host.isNotBlank()) chooseSiteShieldMode(host, siteMode)
+                    }
+                    .setNegativeButton("Update filters") { _, _ ->
+                        shieldsBridge.update(host) { updated, updateError ->
+                            runOnUiThread {
+                                if (updated == null) Toast.makeText(this, updateError ?: "Filter update failed.", Toast.LENGTH_LONG).show()
+                                else {
+                                    Toast.makeText(this, "EasyList and EasyPrivacy filters refreshed.", Toast.LENGTH_LONG).show()
+                                    current()?.session?.reload()
+                                }
+                            }
+                        }
+                    }.show()
+            }
+        }
+    }
+
+    private fun chooseGlobalShieldMode(host: String, currentMode: String) {
+        val labels = arrayOf(
+            "Standard — block third-party ads and trackers",
+            "Aggressive — also apply filters to first-party requests",
+            "Off — disable Nova's filter blocking"
+        )
+        val values = arrayOf("standard", "aggressive", "off")
+        val selected = values.indexOf(currentMode).coerceAtLeast(0)
+        AlertDialog.Builder(this).setTitle("Global Shields protection")
+            .setSingleChoiceItems(labels, selected) { dialog, which ->
+                shieldsBridge.setMode(host, values[which]) { state, error ->
+                    runOnUiThread {
+                        dialog.dismiss()
+                        if (state == null) Toast.makeText(this, error ?: "Could not update Shields.", Toast.LENGTH_LONG).show()
+                        else {
+                            Toast.makeText(this, "Global Shields set to " + values[which] + ". Reloading page.", Toast.LENGTH_SHORT).show()
+                            current()?.session?.reload()
+                        }
+                    }
+                }
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun chooseSiteShieldMode(host: String, currentMode: String) {
+        val labels = arrayOf(
+            "Use global setting",
+            "Turn Shields off for this site",
+            "Aggressive blocking for this site"
+        )
+        val values = arrayOf("default", "off", "aggressive")
+        val selected = values.indexOf(currentMode).coerceAtLeast(0)
+        AlertDialog.Builder(this).setTitle("Shields for " + host)
+            .setSingleChoiceItems(labels, selected) { dialog, which ->
+                shieldsBridge.setSiteMode(host, values[which]) { state, error ->
+                    runOnUiThread {
+                        dialog.dismiss()
+                        if (state == null) Toast.makeText(this, error ?: "Could not update site protection.", Toast.LENGTH_LONG).show()
+                        else {
+                            Toast.makeText(this, "Site protection updated. Reloading page.", Toast.LENGTH_SHORT).show()
+                            current()?.session?.reload()
+                        }
+                    }
+                }
+            }.setNegativeButton("Cancel", null).show()
     }
 
     private fun showPrivacyControls() {
