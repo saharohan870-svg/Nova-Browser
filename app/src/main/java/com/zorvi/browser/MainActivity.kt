@@ -66,6 +66,7 @@ class MainActivity : Activity() {
     private var pendingAndroidPermission: GeckoSession.PermissionDelegate.Callback? = null
     private val requestFile = 4101
     private val requestWebPermission = 4102
+    private val requestSearchAttachment = 4103
     private val requestWireGuardConfig = 4110
     private val requestWireGuardConsent = 4111
     private val wireGuardStore by lazy { WireGuardConfigStore(this) }
@@ -146,6 +147,7 @@ class MainActivity : Activity() {
             }
         }
         top.addView(address, LinearLayout.LayoutParams(0, 48, 1f))
+        top.addView(button("＋") { pickSearchAttachment() }, LinearLayout.LayoutParams(42, 48))
         top.addView(button("Go") { navigate(address.text.toString()) })
         root.addView(top)
 
@@ -2085,8 +2087,42 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun pickSearchAttachment() {
+        val picker = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "application/pdf", "text/plain", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+        }
+        try {
+            startActivityForResult(picker, requestSearchAttachment)
+        } catch (_: Exception) {
+            Toast.makeText(this, "No file picker is available on this device.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun shareSearchAttachment(uri: Uri) {
+        val mime = contentResolver.getType(uri) ?: "*/*"
+        val query = address.text.toString().trim()
+        val share = Intent(Intent.ACTION_SEND).apply {
+            type = mime
+            putExtra(Intent.EXTRA_STREAM, uri)
+            if (query.isNotEmpty()) putExtra(Intent.EXTRA_TEXT, query)
+            clipData = android.content.ClipData.newUri(contentResolver, "Nova search attachment", uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try {
+            startActivity(Intent.createChooser(share, "Share file with a search or AI app"))
+        } catch (_: Exception) {
+            Toast.makeText(this, "No compatible app can receive this file.", Toast.LENGTH_LONG).show()
+        }
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == requestSearchAttachment) {
+            if (resultCode == RESULT_OK) data?.data?.let { uri -> shareSearchAttachment(uri) }
+            return
+        }
         if (requestCode == requestWireGuardConfig) {
             if (resultCode == RESULT_OK && data?.data != null) handleWireGuardProfile(data.data!!)
             return
