@@ -7,10 +7,18 @@ import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.WebExtension
 
 /** User-triggered bridge to Gecko's cookies API. Callers must encrypt exported cookies before cloud upload. */
-internal class NovaCookieSyncBridge(private val runtime: GeckoRuntime) {
+internal class NovaCookieSyncBridge(private var runtime: GeckoRuntime) {
     @Volatile private var port: WebExtension.Port? = null
     @Volatile private var exportCallback: ((org.json.JSONArray?, String?) -> Unit)? = null
     @Volatile private var importCallback: ((Int, Int, String?) -> Unit)? = null
+
+    fun rebind(nextRuntime: GeckoRuntime, callback: (Boolean, String?) -> Unit) {
+        port = null
+        exportCallback = null
+        importCallback = null
+        runtime = nextRuntime
+        install(callback)
+    }
 
     fun install(callback: (Boolean, String?) -> Unit) {
         runtime.webExtensionController.ensureBuiltIn(
