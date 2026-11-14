@@ -173,6 +173,7 @@ class MainActivity : Activity() {
         controls.addView(button("Sites") { showCompatibilitySites(false) })
         controls.addView(button("Desktop") { toggleDesktopMode() })
         controls.addView(button("Home") { openHome() })
+        controls.addView(button("Settings") { showSettings() })
         controls.addView(button("Tools") { showAdvancedTools() })
         controls.addView(button("🛡 Shields") { showBraveShields() })
         controls.addView(button("Permissions") { showPermissionDashboard() })
@@ -852,6 +853,21 @@ class MainActivity : Activity() {
             }.setNegativeButton("Cancel", null).show()
     }
 
+    private fun showSettings() {
+        val options = listOf(
+            "Show home shortcuts" to "Show or hide the quick links on Nova's start page.",
+            "Customize home page" to "Choose the website opened by Home and new tabs.",
+            "Search engine" to "Choose Google, Bing, DuckDuckGo or Brave Search."
+        )
+        showDescribedOptions("Nova settings", options) { choice ->
+            when (choice) {
+                0 -> toggleHomeShortcuts()
+                1 -> customizeHomePage()
+                2 -> engine.performClick()
+            }
+        }
+    }
+
     private fun toggleHomeShortcuts() {
         val hide = !prefs.getBoolean("hide_home_shortcuts", false)
         prefs.edit().putBoolean("hide_home_shortcuts", hide).apply()
@@ -1501,7 +1517,7 @@ class MainActivity : Activity() {
             override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) { tab.canGoBack = canGoBack }
             override fun onCanGoForward(session: GeckoSession, canGoForward: Boolean) { tab.canGoForward = canGoForward }
             override fun onNewSession(session: GeckoSession, uri: String): GeckoResult<GeckoSession> {
-                newTab("about:blank")
+                newTab(homePage())
                 return GeckoResult.fromValue(current()!!.session)
             }
             override fun onLocationChange(
