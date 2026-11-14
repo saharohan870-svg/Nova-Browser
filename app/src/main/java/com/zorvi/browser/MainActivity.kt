@@ -104,8 +104,7 @@ class MainActivity : Activity() {
         novaAuth.restoreSession { restored -> refreshAccountButton(); if (restored) syncCloud(showMessage = false) }
         applyCookiePolicy()
         configureLoginStorage()
-        cookieSyncBridge.install { ok, error -> if (!ok) android.util.Log.e("NovaCookieSync", error ?: "Extension setup failed") }
-        shieldsBridge.install { ok, error -> if (!ok) android.util.Log.e("NovaShields", error ?: "Extension setup failed") }
+        installRuntimeBridges()
         restoreTabs()
         if (tabs.isEmpty()) newTab(homePage())
     }
@@ -1321,6 +1320,15 @@ class MainActivity : Activity() {
             .setNegativeButton("Close", null).show()
     }
 
+    private fun installRuntimeBridges() {
+        cookieSyncBridge.rebind(runtime) { ok, error ->
+            if (!ok) android.util.Log.e("NovaCookieSync", error ?: "Extension setup failed")
+        }
+        shieldsBridge.rebind(runtime) { ok, error ->
+            if (!ok) android.util.Log.e("NovaShields", error ?: "Extension setup failed")
+        }
+    }
+
     private fun applyCookiePolicy() {
         val defaultPolicy = org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_FIRST_PARTY_AND_ISOLATE_OTHERS
         val policy = prefs.getInt("cookie_policy", defaultPolicy)
@@ -2305,6 +2313,7 @@ class MainActivity : Activity() {
                 torController.stop()
                 resetRuntime(false, 0)
                 applyCookiePolicy()
+                installRuntimeBridges()
                 restoreTabs()
                 if (tabs.isEmpty()) newTab(homePage())
                 refreshGuestModeButton()
@@ -2315,6 +2324,7 @@ class MainActivity : Activity() {
             }
             resetRuntime(true, socksPort)
             applyCookiePolicy()
+            installRuntimeBridges()
             newTab("about:blank")
             Toast.makeText(this, "Tor connected. Guest Mode is active.", Toast.LENGTH_LONG).show()
             showGuestTorStatus()
@@ -2330,6 +2340,7 @@ class MainActivity : Activity() {
         resetRuntime(false, 0)
         torController.stop()
         applyCookiePolicy()
+        installRuntimeBridges()
         restoreTabs()
         if (tabs.isEmpty()) newTab(homePage())
         guestReturnTab = null
