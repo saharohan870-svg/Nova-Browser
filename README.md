@@ -87,3 +87,12 @@ The optional **Sessions** action uses a bundled, privileged GeckoView WebExtensi
 This is not a raw Gecko profile copy. GeckoView does not provide a supported portable whole-profile export/import API. Cache, localStorage/IndexedDB, service-worker state, device-bound credentials, passkeys, TLS client certificates, downloads, and other profile internals are not migrated. Those require separate supported per-feature sync designs and cannot safely be copied as a profile folder between Android devices.
 
 These additions require a successful CI build and device testing before they should be treated as production-ready.
+
+
+### Nova Shields (Brave-style protection controls)
+
+Nova's Shields panel provides global Standard, Aggressive and Off modes, plus per-site overrides. Standard mode uses EasyList and EasyPrivacy network/cosmetic rules with GeckoView tracking protection. Aggressive mode also evaluates applicable filter rules against first-party requests and can cause site breakage. Per-site overrides can turn filtering off for a site or apply aggressive filtering. The panel reports the current filter counts and blocked-request count and can manually refresh filter subscriptions.
+
+Nova also exposes GeckoView cookie controls (block known trackers, block third-party cookies, allow all cookies, or block all cookies) in Privacy and Protection settings. Entering ordinary hostnames in the address bar already uses HTTPS by default.
+
+This is a Brave-inspired feature set, not Brave's proprietary Shields implementation. Nova does not currently implement Brave's fingerprint randomization, per-site cookie partitioning/ephemeral third-party storage, script-blocking UI, Forget-me-on-close, phishing/malware reputation checks, CNAME uncloaking, or Brave's full first-party resource replacement. GeckoView tracking protection and cookie policies are distinct native protections. Aggressive filter mode is not equivalent to Brave's complete aggressive Shields mode.
