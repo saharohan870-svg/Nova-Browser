@@ -129,7 +129,7 @@ const checks = [
   ["Shields bridge handles disconnect", /onDisconnect/.test(shields)],
   ["adblock parser rejects unsupported rules safely", /opt\.unsupported/.test(filter)],
   ["manifest declares internet permission", /android\.permission\.INTERNET/.test(manifest)],
-  ["home page declares English language", /<html[^>]*lang="en"/i.test(home)),
+  ["home page declares English language", /<html[^>]*lang="en"/i.test(home)],
 ];
 let passed = 0;
 for (let i = 0; i < checks.length; i++) {
