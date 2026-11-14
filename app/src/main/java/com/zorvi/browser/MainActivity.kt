@@ -1266,7 +1266,7 @@ class MainActivity : Activity() {
     }
 
     private fun applyCookiePolicy() {
-        val defaultPolicy = org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_NON_TRACKERS
+        val defaultPolicy = org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_FIRST_PARTY_AND_ISOLATE_OTHERS
         val policy = prefs.getInt("cookie_policy", defaultPolicy)
         runtime.settings.contentBlocking.setCookieBehavior(policy)
         runtime.settings.contentBlocking.setCookieBehaviorPrivateMode(policy)
@@ -1275,14 +1275,16 @@ class MainActivity : Activity() {
 
     private fun chooseCookiePolicy() {
         val labels = arrayOf(
-            "Block known trackers (recommended)",
+            "Isolate third-party cookies (recommended)",
+            "Block known trackers",
             "Block all third-party cookies",
             "Allow all cookies",
             "Block all cookies"
         )
         val values = intArrayOf(
-            org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_NON_TRACKERS,
             org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_FIRST_PARTY_AND_ISOLATE_OTHERS,
+            org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_NON_TRACKERS,
+            org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_FIRST_PARTY,
             org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_ALL,
             org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_NONE
         )
@@ -2438,8 +2440,10 @@ class MainActivity : Activity() {
                         settings.configFilePath("")
                     }
                     GeckoRuntime.create(context.applicationContext, settings.build()).also { created ->
-                        created.settings.setFingerprintingProtection(true)
-                        created.settings.setFingerprintingProtectionPrivateBrowsing(true)
+                        val fingerprintingEnabled = context.getSharedPreferences("zorvi", Context.MODE_PRIVATE)
+                            .getBoolean("fingerprinting_protection", true)
+                        created.settings.setFingerprintingProtection(fingerprintingEnabled)
+                        created.settings.setFingerprintingProtectionPrivateBrowsing(fingerprintingEnabled)
                         created.settings.setGlobalPrivacyControl(true)
                         created.settings.setCookieBehaviorOptInPartitioning(true)
                         created.settings.setCookieBehaviorOptInPartitioningPBM(true)
