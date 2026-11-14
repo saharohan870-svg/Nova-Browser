@@ -47,3 +47,9 @@ test("aggressive mode also evaluates first-party filter rules",()=>{
  assert.equal(Engine.decide(c,req("https://cdn.publisher.com/app.js"),"publisher.com"),false);
  assert.equal(Engine.decide(c,req("https://cdn.publisher.com/app.js"),"publisher.com",true),true);
 });
+
+test("standard mode treats unqualified network rules as third-party by default",()=>{
+ const c=Engine.compile(["||cdn.publisher.com^"]);
+ assert.equal(Engine.decide(c,req("https://cdn.publisher.com/app.js"),"publisher.com"),false);
+ assert.equal(Engine.decide(c,req("https://cdn.publisher.com/app.js"),"publisher.com",true),true);
+});
