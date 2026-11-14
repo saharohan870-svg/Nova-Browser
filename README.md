@@ -96,3 +96,8 @@ Nova's Shields panel provides global Standard, Aggressive and Off modes, plus pe
 Nova also exposes GeckoView cookie controls (block known trackers, block third-party cookies, allow all cookies, or block all cookies) in Privacy and Protection settings. Entering ordinary hostnames in the address bar already uses HTTPS by default.
 
 This is a Brave-inspired feature set, not Brave's proprietary Shields implementation. Nova does not currently implement Brave's fingerprint randomization, per-site cookie partitioning/ephemeral third-party storage, Forget-me-on-close, phishing/malware reputation checks, CNAME uncloaking, or Brave's full first-party resource replacement. Script blocking is per-site and can break websites; HTTPS-first currently upgrades HTTP addresses entered in the address bar, but does not yet intercept every in-page HTTP navigation or provide automatic HTTP fallback. GeckoView tracking protection and cookie policies are distinct native protections. Aggressive filter mode is not equivalent to Brave's complete aggressive Shields mode.
+
+
+### Advanced privacy controls
+
+Nova enables GeckoView fingerprinting protection and Global Privacy Control by default, with an in-app toggle for fingerprinting protection. Cookie controls include GeckoView first-party-and-isolate-others behavior (dynamic first-party isolation) and Gecko tracking-cookie purging where supported. The optional **Clear site data on exit** switch is off by default; when enabled, Nova requests GeckoView to clear site data during normal app shutdown. This may sign users out of websites. Android may terminate an app without running its shutdown callback, so this is best-effort rather than a guaranteed cleanup schedule. It does not delete downloaded files or Nova saved passwords.
