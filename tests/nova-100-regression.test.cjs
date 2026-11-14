@@ -74,7 +74,7 @@ const checks = [
   ["Guest Mode hides personal history", /Personal history and bookmarks are hidden in Guest Mode/.test(main)],
   ["Guest Mode blocks account actions", /Nova account actions are disabled in Guest Mode/.test(main)],
   ["private and guest sessions block downloads", /Downloads are disabled in private and guest sessions/.test(main)],
-  ["Guest Mode blocks external app links", /guestMode[\s\S]{0,800}External app links are blocked|External app links are blocked/.test(main)],
+  ["Guest Mode blocks external app links", /if \(tab\\.guest\) return GeckoResult\\.deny\\(\)/.test(main)],
   // Tor service and routing (51-60)
   ["Tor controller class exists", /class NovaTorController/.test(tor)],
   ["Tor binds the Android service", /bindService\(/.test(tor)],
