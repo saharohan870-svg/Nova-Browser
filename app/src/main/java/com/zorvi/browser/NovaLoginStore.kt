@@ -24,14 +24,17 @@ internal class NovaLoginStore(context: Context, account: String) {
 
     fun fetch(domain: String? = null): Array<Autocomplete.LoginEntry> = synchronized(lock) {
         val entries = read()
-        entries.filter {
-            if (domain == null) true
-            else {
-                val host = runCatching { java.net.URI(it.optString("origin")).host }.getOrNull()
+        val matching = mutableListOf<JSONObject>()
+        for (i in 0 until entries.length()) {
+            val item = entries.optJSONObject(i) ?: continue
+            val matches = if (domain == null) true else {
+                val host = runCatching { java.net.URI(item.optString("origin")).host }.getOrNull()
                 host.equals(domain, ignoreCase = true) ||
-                    it.optString("origin").equals(domain, ignoreCase = true)
+                    item.optString("origin").equals(domain, ignoreCase = true)
             }
-        }.map { toEntry(it) }.toTypedArray()
+            if (matches) matching.add(item)
+        }
+        matching.map { toEntry(it) }.toTypedArray()
     }
 
     fun save(login: Autocomplete.LoginEntry) = synchronized(lock) {
