@@ -4,11 +4,11 @@ const LISTS=[
  {key:"easyprivacy",name:"EasyPrivacy",url:"https://easylist.to/easylist/easyprivacy.txt"}
 ];
 const UPDATE_MS=86400000;
-let compiled=NovaAdblockEngine.compile([]),enabled=true,firstParty=new Map();
+let compiled=NovaAdblockEngine.compile([]),enabled=true,mode="standard",siteOverrides={},firstParty=new Map(),nativePort=null;
 let stats={blocked:0,updatedAt:0,networkRules:0,cosmeticRules:0};
 async function rebuild(){
  const saved=await browser.storage.local.get(["filter_easylist","filter_easyprivacy","enabled","stats"]);
- enabled=saved.enabled!==false;
+ enabled=saved.enabled!==false;\n mode=["standard","aggressive","off"].includes(saved.mode)?saved.mode:(enabled?"standard":"off");\n siteOverrides=saved.siteOverrides||{};
  if(saved.stats)stats={...stats,...saved.stats};
  const lines=[];
  for(const list of LISTS)if(Array.isArray(saved["filter_"+list.key]))lines.push(...saved["filter_"+list.key]);
@@ -57,4 +57,4 @@ browser.runtime.onMessage.addListener(async message=>{
 browser.runtime.onInstalled.addListener(async()=>{await rebuild();await updateLists(false)});
 browser.runtime.onStartup.addListener(async()=>{await rebuild();await updateLists(false)});
 (async()=>{await rebuild();await updateLists(false);browser.alarms.create("nova-filter-update",{periodInMinutes:1440})})();
-browser.alarms.onAlarm.addListener(alarm=>{if(alarm.name==="nova-filter-update")updateLists(true)});
+browser.alarms.onAlarm.addListener(alarm=>{if(alarm.name==="nova-filter-update")updateLists(true)});\ntry{nativePort=browser.runtime.connectNative("browser");nativePort.onMessage.addListener(async message=>{if(!message)return;if(message.type==="getShield")nativePort.postMessage({type:"shieldState",host:message.host||"",enabled:mode!=="off",mode,siteMode:siteOverrides[message.host||""]||"default",stats});else if(message.type==="setMode"){mode=["standard","aggressive","off"].includes(message.mode)?message.mode:"standard";enabled=mode!=="off";await browser.storage.local.set({enabled,mode});nativePort.postMessage({type:"shieldState",host:message.host||"",enabled,mode,siteMode:siteOverrides[message.host||""]||"default",stats});}else if(message.type==="setSiteMode"){const host=String(message.host||"").toLowerCase();if(host&&/^[a-z0-9.-]+$/.test(host)){const next={...siteOverrides};if(message.mode==="default")delete next[host];else if(["off","aggressive"].includes(message.mode))next[host]=message.mode;siteOverrides=next;await browser.storage.local.set({siteOverrides});nativePort.postMessage({type:"shieldState",host,enabled:mode!=="off",mode,siteMode:siteOverrides[host]||"default",stats});}}});}catch(error){console.warn("[NovaAdBlock] native settings bridge unavailable",error);}
