@@ -24,7 +24,7 @@ function blocked(c, url, type = "script", party = "news.example") {
 }
 {
   const c = compile("||cdn.example.com^$third-party");
-  assert.equal(blocked(c, "https://cdn.example.com/a.js", "script", "www.example.com"), false);
+  assert.equal(blocked(c, "https://cdn.example.com/a.js", "script", "www.example.com"), true, "unknown sibling subdomains are conservatively treated as third-party");
   assert.equal(blocked(c, "https://cdn.example.com/a.js", "script", "news.other"), true);
 }
 {
@@ -49,4 +49,9 @@ function blocked(c, url, type = "script", party = "news.example") {
   const reversed = compile("@@||important.example^\n||important.example^$important");
   assert.equal(blocked(reversed, "https://important.example/ad.js"), true, "important block wins even when exception appears first");
 }
-console.log("Nova AdBlock engine tests passed: 7 groups");
+{
+  const c = compile("||cdn.example^$third-party");
+  assert.equal(blocked(c, "https://cdn.example/a.js", "script", "cdn.example"), false, "same host remains first-party");
+  assert.equal(blocked(c, "https://cdn.example/a.js", "script", "shop.example"), true, "different host is third-party");
+}
+console.log("Nova AdBlock engine tests passed: 8 groups");
