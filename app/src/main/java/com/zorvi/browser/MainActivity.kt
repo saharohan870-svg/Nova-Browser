@@ -1147,12 +1147,16 @@ class MainActivity : Activity() {
                     "\nLoaded network rules: " + network + "\nCosmetic rules: " + cosmetic +
                     "\n\nNova Shields uses EasyList and EasyPrivacy filters, GeckoView tracking protection and cookie controls."
                 val httpsLabel = if (prefs.getBoolean("https_upgrade", true)) "HTTPS-first: On" else "HTTPS-first: Off"
+                val fingerprintingLabel = if (prefs.getBoolean("fingerprinting_protection", true)) "Fingerprint protection: On" else "Fingerprint protection: Off"
+                val cleanupLabel = if (prefs.getBoolean("auto_clear_site_data", false)) "Clear site data on exit: On" else "Clear site data on exit: Off"
                 val actions = arrayOf(
                     "Global protection",
                     "Protection for this site",
                     if (scriptsBlocked) "Allow scripts on this site" else "Block scripts on this site",
                     "Cookie policy",
                     httpsLabel,
+                    fingerprintingLabel,
+                    cleanupLabel,
                     "Update filter lists"
                 )
                 AlertDialog.Builder(this).setTitle("Nova Shields · " + siteLabel).setMessage(message)
@@ -1175,7 +1179,19 @@ class MainActivity : Activity() {
                                 prefs.edit().putBoolean("https_upgrade", enabled).apply()
                                 Toast.makeText(this, if (enabled) "HTTPS-first enabled." else "HTTPS-first disabled.", Toast.LENGTH_SHORT).show()
                             }
-                            5 -> shieldsBridge.update(host) { updated, updateError ->
+                            5 -> {
+                                val enabled = !prefs.getBoolean("fingerprinting_protection", true)
+                                prefs.edit().putBoolean("fingerprinting_protection", enabled).apply()
+                                runtime.settings.setFingerprintingProtection(enabled)
+                                runtime.settings.setFingerprintingProtectionPrivateBrowsing(enabled)
+                                Toast.makeText(this, if (enabled) "Fingerprint protection enabled." else "Fingerprint protection disabled.", Toast.LENGTH_SHORT).show()
+                            }
+                            6 -> {
+                                val enabled = !prefs.getBoolean("auto_clear_site_data", false)
+                                prefs.edit().putBoolean("auto_clear_site_data", enabled).apply()
+                                Toast.makeText(this, if (enabled) "Site data will be cleared when Nova exits." else "Automatic site-data cleanup disabled.", Toast.LENGTH_LONG).show()
+                            }
+                            7 -> shieldsBridge.update(host) { updated, updateError ->
                                 runOnUiThread {
                                     if (updated == null) Toast.makeText(this, updateError ?: "Filter update failed.", Toast.LENGTH_LONG).show()
                                     else {
@@ -1254,6 +1270,7 @@ class MainActivity : Activity() {
         val policy = prefs.getInt("cookie_policy", defaultPolicy)
         runtime.settings.contentBlocking.setCookieBehavior(policy)
         runtime.settings.contentBlocking.setCookieBehaviorPrivateMode(policy)
+        runtime.settings.contentBlocking.setCookiePurging(true)
     }
 
     private fun chooseCookiePolicy() {
@@ -1265,7 +1282,7 @@ class MainActivity : Activity() {
         )
         val values = intArrayOf(
             org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_NON_TRACKERS,
-            org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_FIRST_PARTY,
+            org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_FIRST_PARTY_AND_ISOLATE_OTHERS,
             org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_ALL,
             org.mozilla.geckoview.ContentBlocking.CookieBehavior.ACCEPT_NONE
         )
@@ -1277,6 +1294,7 @@ class MainActivity : Activity() {
                 prefs.edit().putInt("cookie_policy", policy).apply()
                 runtime.settings.contentBlocking.setCookieBehavior(policy)
                 runtime.settings.contentBlocking.setCookieBehaviorPrivateMode(policy)
+                runtime.settings.contentBlocking.setCookiePurging(true)
                 dialog.dismiss()
                 Toast.makeText(this, "Cookie policy updated. Reload pages to apply changes.", Toast.LENGTH_LONG).show()
             }.setNegativeButton("Cancel", null).show()
@@ -2366,6 +2384,10 @@ class MainActivity : Activity() {
             if (tab.session.isOpen) tab.session.close()
         }
         tabs.clear()
+        if (prefs.getBoolean("auto_clear_site_data", false) && !guestMode) {
+            runCatching { runtime.storageController.clearData(org.mozilla.geckoview.StorageController.ClearFlags.SITE_DATA) }
+                .onFailure { android.util.Log.e("NovaPrivacy", "Automatic site-data cleanup failed", it) }
+        }
         vaultSyncPassphrase?.fill('\u0000')
         vaultSyncPassphrase = null
         if (guestMode) resetRuntime(false, 0)
@@ -2416,6 +2438,12 @@ class MainActivity : Activity() {
                         settings.configFilePath("")
                     }
                     GeckoRuntime.create(context.applicationContext, settings.build()).also { created ->
+                        created.settings.setFingerprintingProtection(true)
+                        created.settings.setFingerprintingProtectionPrivateBrowsing(true)
+                        created.settings.setGlobalPrivacyControl(true)
+                        created.settings.setCookieBehaviorOptInPartitioning(true)
+                        created.settings.setCookieBehaviorOptInPartitioningPBM(true)
+                        created.settings.contentBlocking.setCookiePurging(true)
                         sharedRuntime = created
                         created.webExtensionController.ensureBuiltIn(
                             "resource://android/assets/nova_adblock/",
