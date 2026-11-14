@@ -10,7 +10,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%;background:#050608;color:#f5f5f7}
 body{min-height:100vh;display:grid;place-items:center;overflow-x:hidden}
-.wallpaper{position:fixed;inset:0;background-color:#050608;background-image:linear-gradient(90deg,rgba(0,0,0,.68),rgba(0,0,0,.28) 55%,rgba(0,0,0,.68)),linear-gradient(0deg,rgba(0,0,0,.72),transparent 65%),url("https://server.wallpaperalchemy.com/storage/wallpapers/717/kali-linux-dragon-logo-4k-wallpaper.jpg");background-size:cover;background-position:center;background-repeat:no-repeat;filter:brightness(.78);z-index:0}
+.wallpaper{position:fixed;inset:0;background-color:#050608;background-image:linear-gradient(90deg,rgba(0,0,0,.68),rgba(0,0,0,.28) 55%,rgba(0,0,0,.68)),linear-gradient(0deg,rgba(0,0,0,.72),transparent 65%),url("https://www.kali.org/images/kali-dragon-icon.svg");background-size:min(78vw,620px);background-position:center 44%;background-repeat:no-repeat;filter:brightness(.82);z-index:0}
 main{position:relative;z-index:1;width:min(680px,92vw);padding:32px 20px;text-align:center;margin:auto}
 .brand{font-size:clamp(32px,8vw,54px);font-weight:750;letter-spacing:-2px;margin:0 0 8px;text-shadow:0 3px 22px #000}
 .sub{margin:0 0 30px;color:#d4d4d8;font-size:14px;text-shadow:0 2px 10px #000}
@@ -24,6 +24,7 @@ button{border:0;border-radius:13px;padding:0 19px;background:#1769aa;color:#fff;
 a{color:#fff;text-decoration:none}
 .shortcut{min-width:88px;padding:13px 15px;border:1px solid #ffffff24;border-radius:14px;background:#101318b8;backdrop-filter:blur(12px);font-size:13px}
 .shortcut:active,button:active{transform:scale(.97)}
+.shortcuts[hidden]{display:none!important}
 .footer{margin-top:30px;color:#c5c5cb;font-size:11px;text-shadow:0 2px 8px #000}
 @media(prefers-reduced-motion:no-preference){.wallpaper{animation:fadein .8s ease-out}@keyframes fadein{from{opacity:.4}to{opacity:1}}}
 </style>
@@ -37,7 +38,7 @@ a{color:#fff;text-decoration:none}
 <input id="query" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search the web or enter an address" aria-label="Search the web">
 <button type="submit">Search</button>
 </form>
-<nav class="shortcuts" aria-label="Quick links">
+<nav class="shortcuts" id="shortcuts" aria-label="Quick links">
 <a class="shortcut" href="https://www.google.com">Google</a>
 <a class="shortcut" href="https://www.youtube.com">YouTube</a>
 <a class="shortcut" href="https://www.perplexity.ai">Perplexity</a>
@@ -46,6 +47,7 @@ a{color:#fff;text-decoration:none}
 <p class="footer">Your browsing stays on your device unless you choose to use an online service.</p>
 </main>
 <script>
+if(new URLSearchParams(location.search).get("hideShortcuts")==="1")document.getElementById("shortcuts").hidden=true;
 document.getElementById("searchForm").addEventListener("submit",function(event){
  event.preventDefault();
  const value=document.getElementById("query").value.trim();
